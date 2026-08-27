@@ -9,7 +9,7 @@ import {
   ProfileForm,
   type ProfileFormSection,
 } from "@/components/dashboard/profile-form";
-import { Logo } from "@/components/ui/logo";
+import { AppNavbar } from "@/components/ui/app-navbar";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProfileLanguage } from "@/lib/types";
 
@@ -125,17 +125,12 @@ export default async function DashboardPage({
 
   return (
     <main className="min-h-screen bg-[#11110d] text-[#edeae0]">
-      <nav className="border-b border-[#2b2a24] bg-[#11110d]">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <Logo />
-          <div className="flex items-center gap-3">
-            <span className="hidden max-w-56 truncate font-mono text-[10px] text-[#77746b] md:inline">
-              {email}
-            </span>
-            <LogoutButton />
-          </div>
-        </div>
-      </nav>
+      <AppNavbar className="bg-[#11110d]">
+        <span className="hidden max-w-56 truncate font-mono text-[10px] text-[#77746b] md:inline">
+          {email}
+        </span>
+        <LogoutButton />
+      </AppNavbar>
 
       <div className="mx-auto max-w-5xl px-5 pb-16 pt-10 sm:px-8 sm:pt-14">
         <header className="mb-12 max-w-2xl">

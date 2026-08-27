@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Avatar } from "@/components/profile/avatar";
+import { AppNavbar } from "@/components/ui/app-navbar";
 import { Logo } from "@/components/ui/logo";
 import { formatCodingTime, formatNumber } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -67,43 +68,40 @@ export default async function Home() {
 
   return (
     <main className="overflow-x-hidden bg-[#11110d] text-[#edeae0]">
-      <nav className="border-b border-[#2b2a24]">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <Logo />
-          <div className="flex items-center gap-3 font-mono text-xs sm:gap-4">
-            {userId ? (
-              <>
-                <Link
-                  href={profileUsername ? `/u/${profileUsername}` : "/dashboard"}
-                  className="border border-[#3b3931] px-3 py-2 text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-                >
-                  {profileUsername ? "Your profile" : "Set up profile"}
-                </Link>
-                <LogoutButton />
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="text-[#aaa69a] transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-                >
-                  Log in
-                </Link>
-                <Link
-                  href="/signup"
-                  className="border border-[#3b3931] px-3 py-2 text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-                >
-                  Create profile
-                </Link>
-              </>
-            )}
-          </div>
+      <AppNavbar>
+        <div className="flex items-center gap-3 font-mono text-xs sm:gap-4">
+          {userId ? (
+            <>
+              <Link
+                href={profileUsername ? `/u/${profileUsername}` : "/dashboard"}
+                className="border border-[#3b3931] px-3 py-2 text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+              >
+                {profileUsername ? "Your profile" : "Set up profile"}
+              </Link>
+              <LogoutButton />
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-[#aaa69a] transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/signup"
+                className="border border-[#3b3931] px-3 py-2 text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+              >
+                Create profile
+              </Link>
+            </>
+          )}
         </div>
-      </nav>
+      </AppNavbar>
 
       <section className="mx-auto w-full max-w-6xl px-5 pb-16 pt-12 sm:px-8 sm:pt-16 lg:pb-18">
         <div className="mx-auto max-w-5xl text-center">
-          <h1 className="[font-family:Georgia,'Times_New_Roman',serif] text-5xl leading-[0.98] tracking-[-0.045em] text-[#edeae0] [text-wrap:balance] sm:text-6xl lg:text-7xl">
+          <h1 className="[font-family:Georgia,'Times_New_Roman',serif] text-[2.75rem] leading-[0.98] tracking-[-0.045em] text-[#edeae0] [text-wrap:balance] sm:text-[3.5rem] lg:text-[4rem]">
             Your development. One profile.
           </h1>
           <p className="mt-5 text-base leading-7 text-[#aaa69a] sm:text-lg">
@@ -130,7 +128,7 @@ export default async function Home() {
         </div>
 
         <div className="mx-auto mt-10 max-w-4xl sm:mt-12">
-          <p className="mb-3 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-[#858177]">
+          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-[#edeae0]">
             Example profile
           </p>
           {filProfile ? (

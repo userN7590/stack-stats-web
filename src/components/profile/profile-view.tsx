@@ -5,6 +5,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { Avatar } from "@/components/profile/avatar";
 import { LanguageDonutChart } from "@/components/profile/language-donut-chart";
 import { ProfileBackground } from "@/components/profile/profile-background";
+import { AppNavbar } from "@/components/ui/app-navbar";
 import { Logo } from "@/components/ui/logo";
 import {
   getDisplayFontClass,
@@ -56,30 +57,27 @@ export function ProfileView({
     <main className="relative isolate min-h-screen overflow-x-hidden bg-[#11110d] text-[#edeae0]">
       <ProfileBackground style={backgroundStyle} />
 
-      <nav className="relative z-10 border-b border-[#2b2a24]">
-        <div className="mx-auto flex h-16 max-w-[960px] items-center justify-between px-5 sm:px-8">
-          <Logo />
-          {isOwner && !isExample ? (
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="font-mono text-xs text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-              >
-                Home
-              </Link>
-              <LogoutButton />
-            </div>
-          ) : (
+      <AppNavbar>
+        {isOwner && !isExample ? (
+          <>
             <Link
-              href={isExample ? "/" : "/signup"}
-              className="inline-flex items-center gap-2 font-mono text-xs text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+              href="/"
+              className="font-mono text-xs text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
             >
-              {isExample && <ArrowLeft className="size-3.5" />}
-              {isExample ? "Back home" : "Create your profile"}
+              Home
             </Link>
-          )}
-        </div>
-      </nav>
+            <LogoutButton />
+          </>
+        ) : (
+          <Link
+            href={isExample ? "/" : "/signup"}
+            className="inline-flex items-center gap-2 font-mono text-xs text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+          >
+            {isExample && <ArrowLeft className="size-3.5" />}
+            {isExample ? "Back home" : "Create your profile"}
+          </Link>
+        )}
+      </AppNavbar>
 
       <div className="relative z-10 mx-auto max-w-[840px] px-5 py-10 sm:px-8 sm:py-16">
         {isExample && (

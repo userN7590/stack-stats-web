@@ -3,15 +3,18 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
-import { Logo } from "@/components/ui/logo";
+import { AppNavbar } from "@/components/ui/app-navbar";
 
 export default function DashboardError({ reset }: { reset: () => void }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#11110d] px-5 text-[#edeae0]">
-      <div className="w-full max-w-md text-center">
-        <div className="mb-8 flex justify-center">
-          <Logo />
-        </div>
+    <main className="min-h-screen bg-[#11110d] text-[#edeae0]">
+      <AppNavbar>
+        <Link href="/" className="font-mono text-xs text-[#aaa69a] hover:text-[#edeae0]">
+          Home
+        </Link>
+      </AppNavbar>
+      <div className="grid min-h-[calc(100vh-4rem)] place-items-center px-5">
+        <div className="w-full max-w-md text-center">
         <div className="border-y border-[#2b2a24] py-8">
           <div className="mx-auto grid size-12 place-items-center border border-[#55482e] text-[#d8aa54]">
             <AlertTriangle className="size-5" />
@@ -39,6 +42,7 @@ export default function DashboardError({ reset }: { reset: () => void }) {
               Try again
             </button>
           </div>
+        </div>
         </div>
       </div>
     </main>

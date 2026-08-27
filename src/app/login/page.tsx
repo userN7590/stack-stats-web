@@ -23,6 +23,8 @@ export default async function LoginPage({
       eyebrow="Welcome back"
       title="Log in to your profile"
       description="Update your public profile and keep your coding totals current."
+      alternateHref="/signup"
+      alternateLabel="Create profile"
     >
       <AuthForm mode="login" initialError={initialError} />
     </AuthShell>

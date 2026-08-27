@@ -13,6 +13,8 @@ export default function SignupPage() {
       eyebrow="Get started"
       title="Create your account"
       description="Add the statistics you choose and publish a developer profile under your username."
+      alternateHref="/login"
+      alternateLabel="Log in"
     >
       <AuthForm mode="signup" />
     </AuthShell>

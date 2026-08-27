@@ -3,15 +3,18 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
-import { Logo } from "@/components/ui/logo";
+import { AppNavbar } from "@/components/ui/app-navbar";
 
 export default function ProfileError({ reset }: { reset: () => void }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#11110d] px-5 text-center text-[#edeae0]">
-      <div className="max-w-md">
-        <div className="mb-8 flex justify-center">
-          <Logo />
-        </div>
+    <main className="min-h-screen bg-[#11110d] text-[#edeae0]">
+      <AppNavbar>
+        <Link href="/" className="font-mono text-xs text-[#aaa69a] hover:text-[#edeae0]">
+          Home
+        </Link>
+      </AppNavbar>
+      <div className="grid min-h-[calc(100vh-4rem)] place-items-center px-5 text-center">
+        <div className="max-w-md">
         <div className="border-y border-[#2b2a24] py-8">
           <AlertTriangle className="mx-auto size-8 text-[#d8aa54]" />
           <h1 className="mt-5 [font-family:Georgia,'Times_New_Roman',serif] text-2xl">Profile unavailable</h1>
@@ -26,6 +29,7 @@ export default function ProfileError({ reset }: { reset: () => void }) {
               <RefreshCw className="size-4" /> Try again
             </button>
           </div>
+        </div>
         </div>
       </div>
     </main>
