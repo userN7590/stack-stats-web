@@ -1,0 +1,35 @@
+const numberFormatter = new Intl.NumberFormat("en-US");
+
+export function formatNumber(value: number) {
+  return numberFormatter.format(value);
+}
+
+export function formatCodingTime(totalMinutes: number) {
+  if (totalMinutes < 60) {
+    return `${formatNumber(totalMinutes)}m`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return minutes > 0
+    ? `${formatNumber(hours)}h ${minutes}m`
+    : `${formatNumber(hours)}h`;
+}
+
+export function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "SS";
+}
+
+export function getHostname(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
