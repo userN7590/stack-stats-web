@@ -15,7 +15,7 @@ export default async function LoginPage({
   const { error } = await searchParams;
   const initialError =
     error === "confirmation"
-      ? "That confirmation link is invalid or has expired. Request a new link by signing up again."
+      ? "We could not confirm that account. The link may be invalid or expired; start signup again to request a new confirmation email."
       : undefined;
 
   return (

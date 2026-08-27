@@ -54,9 +54,20 @@ You need Node.js 20.9 or newer, npm, and a Supabase project.
 
 5. In **Authentication → URL Configuration**, set:
 
-   - Site URL: `http://localhost:3000`
-   - Redirect URL: `http://localhost:3000/auth/callback`
-   - Add `https://your-production-domain/auth/callback` before deploying.
+   - Site URL: your deployed application origin (for example,
+     `https://your-production-domain`); use `http://localhost:3000` while the
+     application is local-only.
+   - Redirect URL: `http://localhost:3000/auth/callback?next=/dashboard`
+   - Redirect URL: `https://your-production-domain/auth/callback?next=/dashboard`
+
+   Supabase matches the full redirect URL, including its query string. Keep the
+   `?next=/dashboard` suffix in both entries. For Vercel preview deployments,
+   add an appropriately scoped preview wildcard as described in Supabase's
+   redirect URL documentation.
+
+   In **Authentication → Email Templates → Confirm signup**, keep the
+   confirmation link set to `{{ .ConfirmationURL }}` so it preserves the
+   redirect passed by the application.
 
    Email/password authentication is enabled by default on hosted Supabase
    projects. Hosted projects also require email confirmation by default, so a

@@ -34,7 +34,18 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getClaims();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const isDashboardRoute =
+    request.nextUrl.pathname === "/dashboard" ||
+    request.nextUrl.pathname.startsWith("/dashboard/");
+
+  if (isDashboardRoute && !claimsData?.claims) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+
+    return NextResponse.redirect(loginUrl);
+  }
 
   return response;
 }

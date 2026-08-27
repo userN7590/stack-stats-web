@@ -2,34 +2,45 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 
+function getSafeDestination(origin: string, requestedPath: string | null) {
+  const fallback = new URL("/dashboard", origin);
+
+  if (!requestedPath?.startsWith("/")) {
+    return fallback;
+  }
+
+  const destination = new URL(requestedPath, origin);
+
+  return destination.origin === origin ? destination : fallback;
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const requestedPath = requestUrl.searchParams.get("next") ?? "/dashboard";
-  const next =
-    requestedPath.startsWith("/") && !requestedPath.startsWith("//")
-      ? requestedPath
-      : "/dashboard";
+  const flowId = requestUrl.searchParams.get("sb_flow_id");
+  const destination = getSafeDestination(
+    requestUrl.origin,
+    requestUrl.searchParams.get("next"),
+  );
 
   if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(
+        code,
+        flowId ? { flowId } : undefined,
+      );
 
-    if (!error) {
-      const forwardedHost = request.headers.get("x-forwarded-host");
-      const forwardedProtocol = request.headers.get("x-forwarded-proto") ?? "https";
-
-      if (process.env.NODE_ENV === "development") {
-        return NextResponse.redirect(`${requestUrl.origin}${next}`);
+      if (!error) {
+        return NextResponse.redirect(destination);
       }
-
-      if (forwardedHost) {
-        return NextResponse.redirect(`${forwardedProtocol}://${forwardedHost}${next}`);
-      }
-
-      return NextResponse.redirect(`${requestUrl.origin}${next}`);
+    } catch {
+      // Fall through to a non-sensitive error state on the login page.
     }
   }
 
-  return NextResponse.redirect(`${requestUrl.origin}/login?error=confirmation`);
+  const loginUrl = new URL("/login", requestUrl.origin);
+  loginUrl.searchParams.set("error", "confirmation");
+
+  return NextResponse.redirect(loginUrl);
 }

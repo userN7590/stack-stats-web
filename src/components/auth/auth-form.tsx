@@ -75,7 +75,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
         setFeedback({
           type: "success",
           message:
-            "Account created. Check your inbox to confirm your email, then return here to log in.",
+            "Check your email to confirm your account. After confirmation, you’ll be sent to your dashboard.",
         });
         form.reset();
       } else {
