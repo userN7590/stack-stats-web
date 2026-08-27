@@ -233,10 +233,3 @@ Additional future work includes historical snapshots and trend analytics,
 OAuth/social login, managed image uploads, password recovery, improved email and
 notification flows, richer export options, and broader automated integration
 coverage.
-
-## AI-assisted development disclosure
-
-OpenAI Codex was used as an AI coding assistant for scaffolding, implementation
-support, documentation, design iteration, and code review. The final
-implementation was manually reviewed, configured, tested, and understood by the
-developer.
