@@ -1,3 +1,5 @@
+import type { BackgroundStyle, DisplayFont } from "@/lib/appearance";
+
 export type Profile = {
   user_id: string;
   username: string;
@@ -12,6 +14,8 @@ export type Profile = {
   edit_events: number;
   projects_count: number;
   coding_minutes: number;
+  display_font: DisplayFont;
+  background_style: BackgroundStyle;
   created_at: string;
   updated_at: string;
 };

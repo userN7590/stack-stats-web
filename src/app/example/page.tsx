@@ -22,6 +22,8 @@ const exampleProfile: PublicProfile = {
   edit_events: 12834,
   projects_count: 27,
   coding_minutes: 38572,
+  display_font: "editorial",
+  background_style: "none",
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-08-27T00:00:00.000Z",
   languages: [

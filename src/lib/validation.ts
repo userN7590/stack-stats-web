@@ -118,6 +118,23 @@ export const profileSchema = z
 
 export type ProfileInput = z.infer<typeof profileSchema>;
 
+export const appearanceSchema = z.object({
+  displayFont: z.enum([
+    "editorial",
+    "modern",
+    "terminal",
+    "display",
+    "signature",
+  ]),
+  backgroundStyle: z.enum([
+    "none",
+    "aurora",
+    "signal",
+    "blueprint",
+    "ember",
+  ]),
+});
+
 export const authSchema = z
   .object({
     email: z.email("Enter a valid email address."),

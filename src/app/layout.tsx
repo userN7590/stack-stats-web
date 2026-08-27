@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Stack Stats — Your coding story, in numbers",
+    default: "Stack Stats — Your development, quantified",
     template: "%s · Stack Stats",
   },
   description:
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full bg-[#070a09] antialiased">
+    <html lang="en" className="h-full bg-[#11110d] antialiased">
       <body className="min-h-full">{children}</body>
     </html>
   );

@@ -38,7 +38,7 @@ export function LogoutButton() {
         onClick={handleLogout}
         disabled={isLoading}
         aria-describedby={errorMessage ? "logout-error" : undefined}
-        className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-zinc-400 transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center gap-2 rounded-[3px] border border-[#3b3931] px-3 py-2 font-mono text-xs text-[#aaa69a] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? (
           <LoaderCircle className="size-4 animate-spin" />
@@ -51,7 +51,7 @@ export function LogoutButton() {
         <p
           id="logout-error"
           role="alert"
-          className="absolute right-0 top-full mt-2 w-64 rounded-lg border border-rose-300/15 bg-[#180d10] px-3 py-2 text-xs leading-5 text-rose-200 shadow-xl"
+          className="absolute right-0 top-full mt-2 w-64 rounded-[3px] border border-[#70413d] bg-[#251614] px-3 py-2 text-xs leading-5 text-[#e7a39d]"
         >
           {errorMessage}
         </p>

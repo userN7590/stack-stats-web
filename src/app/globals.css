@@ -1,8 +1,37 @@
 @import "tailwindcss";
 
 :root {
-  --background: #070a09;
-  --foreground: #f4f4f5;
+  --background: #11110d;
+  --foreground: #edeae0;
+  --muted: #969287;
+  --border: #2b2a24;
+  --accent: #55a7ff;
+  --font-profile-editorial: Georgia, "Times New Roman", serif;
+  --font-profile-modern: Arial, "Helvetica Neue", sans-serif;
+  --font-profile-terminal: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-profile-display: "Arial Black", "Arial Narrow", Impact, sans-serif;
+  --font-profile-signature: "Snell Roundhand", "Segoe Script", "Bradley Hand", cursive;
+}
+
+.profile-font-editorial {
+  font-family: var(--font-profile-editorial);
+}
+
+.profile-font-modern {
+  font-family: var(--font-profile-modern);
+}
+
+.profile-font-terminal {
+  font-family: var(--font-profile-terminal);
+}
+
+.profile-font-display {
+  font-family: var(--font-profile-display);
+}
+
+.profile-font-signature {
+  font-family: var(--font-profile-signature);
+  font-weight: 400;
 }
 
 @theme inline {
@@ -13,7 +42,7 @@
 }
 
 * {
-  border-color: color-mix(in srgb, white 8%, transparent);
+  border-color: var(--border);
 }
 
 html {
@@ -36,29 +65,15 @@ textarea {
 }
 
 ::selection {
-  background: rgba(110, 231, 183, 0.25);
+  background: #285f94;
   color: #ffffff;
-}
-
-.hero-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: linear-gradient(to bottom, black 0%, transparent 82%);
-}
-
-.profile-grid {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 0.7px, transparent 0.7px);
-  background-size: 24px 24px;
-  mask-image: linear-gradient(to bottom, black, transparent 70%);
 }
 
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-text-fill-color: #f4f4f5;
-  box-shadow: 0 0 0 1000px #0d110f inset;
+  -webkit-text-fill-color: #edeae0;
+  box-shadow: 0 0 0 1000px #171712 inset;
   transition: background-color 9999s ease-in-out 0s;
 }
 

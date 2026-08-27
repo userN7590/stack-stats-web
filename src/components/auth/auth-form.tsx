@@ -103,12 +103,12 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
   }
 
   const inputClass =
-    "mt-2 h-12 w-full rounded-xl border border-white/10 bg-white/[0.035] px-3.5 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-700 hover:border-white/15 focus:border-emerald-300/40 focus:ring-4 focus:ring-emerald-400/[0.07] disabled:cursor-not-allowed disabled:opacity-60";
+    "mt-2 h-11 w-full rounded-[3px] border border-[#34332c] bg-[#171712] px-3.5 text-sm text-[#edeae0] outline-none transition placeholder:text-[#68655d] hover:border-[#4a483f] focus:border-[#55a7ff] focus:ring-2 focus:ring-[#55a7ff]/20 disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <form onSubmit={handleSubmit} noValidate>
       <div>
-        <label htmlFor="email" className="text-sm font-medium text-zinc-300">
+        <label htmlFor="email" className="font-mono text-xs text-[#c8c4b9]">
           Email address
         </label>
         <input
@@ -125,14 +125,14 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
           className={inputClass}
         />
         {fieldErrors.email && (
-          <p id="email-error" className="mt-1.5 text-xs text-rose-300">
+          <p id="email-error" className="mt-1.5 text-xs text-[#e58b83]">
             {fieldErrors.email}
           </p>
         )}
       </div>
 
       <div className="mt-5">
-        <label htmlFor="password" className="text-sm font-medium text-zinc-300">
+        <label htmlFor="password" className="font-mono text-xs text-[#c8c4b9]">
           Password
         </label>
         <input
@@ -149,7 +149,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
           className={inputClass}
         />
         {fieldErrors.password && (
-          <p id="password-error" className="mt-1.5 text-xs text-rose-300">
+          <p id="password-error" className="mt-1.5 text-xs text-[#e58b83]">
             {fieldErrors.password}
           </p>
         )}
@@ -159,7 +159,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
         <div className="mt-5">
           <label
             htmlFor="confirmPassword"
-            className="text-sm font-medium text-zinc-300"
+            className="font-mono text-xs text-[#c8c4b9]"
           >
             Confirm password
           </label>
@@ -179,7 +179,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
             className={inputClass}
           />
           {fieldErrors.confirmPassword && (
-            <p id="confirm-password-error" className="mt-1.5 text-xs text-rose-300">
+            <p id="confirm-password-error" className="mt-1.5 text-xs text-[#e58b83]">
               {fieldErrors.confirmPassword}
             </p>
           )}
@@ -188,10 +188,10 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
 
       {feedback && (
         <div
-          className={`mt-5 flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-sm leading-5 ${
+          className={`mt-5 flex items-start gap-2.5 rounded-[3px] border px-3.5 py-3 text-sm leading-5 ${
             feedback.type === "success"
-              ? "border-emerald-300/15 bg-emerald-400/[0.07] text-emerald-200"
-              : "border-rose-300/15 bg-rose-400/[0.07] text-rose-200"
+              ? "border-[#356a4d] bg-[#17251b] text-[#8ed8aa]"
+              : "border-[#70413d] bg-[#251614] text-[#e7a39d]"
           }`}
           role={feedback.type === "error" ? "alert" : "status"}
         >
@@ -207,7 +207,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="group mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-300 px-5 text-sm font-semibold text-[#07110d] transition hover:bg-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-4 focus-visible:ring-offset-[#0c100e] disabled:cursor-not-allowed disabled:opacity-60"
+        className="group mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[3px] bg-[#55a7ff] px-5 font-mono text-xs font-semibold text-[#0b1722] transition hover:bg-[#78b8ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] focus-visible:ring-offset-4 focus-visible:ring-offset-[#11110d] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? (
           <>
@@ -222,11 +222,11 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
         )}
       </button>
 
-      <p className="mt-6 text-center text-sm text-zinc-600">
+      <p className="mt-6 text-center text-sm text-[#858177]">
         {isSignup ? "Already have an account?" : "New to Stack Stats?"}{" "}
         <Link
           href={isSignup ? "/login" : "/signup"}
-          className="font-medium text-zinc-300 underline decoration-white/15 underline-offset-4 transition hover:text-white"
+          className="text-[#c8c4b9] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
         >
           {isSignup ? "Log in" : "Create an account"}
         </Link>

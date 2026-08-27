@@ -1,23 +1,35 @@
+import Image from "next/image";
 import Link from "next/link";
 
 type LogoProps = {
   compact?: boolean;
+  wordmarkOnly?: boolean;
 };
 
-export function Logo({ compact = false }: LogoProps) {
+export function Logo({ compact = false, wordmarkOnly = false }: LogoProps) {
   return (
     <Link
       href="/"
-      className="group inline-flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-4 focus-visible:ring-offset-[#070a09]"
+      className="inline-flex items-center outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] focus-visible:ring-offset-4 focus-visible:ring-offset-[#11110d]"
       aria-label="Stack Stats home"
     >
-      <span className="relative grid size-8 place-items-center overflow-hidden rounded-lg border border-emerald-300/30 bg-emerald-400/10 font-mono text-sm font-bold text-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.12)]">
-        <span aria-hidden="true">S/</span>
-      </span>
+      {!wordmarkOnly && (
+        <Image
+          src="/brand/stack-stats-mark.png"
+          alt=""
+          width={3668}
+          height={2740}
+          className={`${compact ? "block" : "block sm:hidden"} h-auto w-8`}
+        />
+      )}
       {!compact && (
-        <span className="text-[15px] font-semibold tracking-tight text-white">
-          Stack <span className="text-zinc-500">Stats</span>
-        </span>
+        <Image
+          src="/brand/stack-stats-wordmark.png"
+          alt="Stack Stats"
+          width={32234}
+          height={3799}
+          className={`${wordmarkOnly ? "block" : "hidden sm:block"} h-auto w-[170px]`}
+        />
       )}
     </Link>
   );

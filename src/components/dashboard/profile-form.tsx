@@ -2,14 +2,7 @@
 
 import {
   AlertCircle,
-  CheckCircle2,
-  Clock3,
-  ExternalLink,
-  FileCode2,
-  FolderKanban,
   LoaderCircle,
-  Minus,
-  MousePointer2,
   Plus,
   Save,
   Trash2,
@@ -25,7 +18,10 @@ import { profileSchema } from "@/lib/validation";
 type ProfileFormProps = {
   initialProfile: Profile | null;
   initialLanguages: ProfileLanguage[];
+  section: ProfileFormSection;
 };
+
+export type ProfileFormSection = "identity" | "links" | "stats" | "languages";
 
 type LanguageRow = {
   rowId: string;
@@ -34,21 +30,20 @@ type LanguageRow = {
 };
 
 type Feedback = {
-  type: "error" | "success";
   message: string;
 } | null;
 
 const stats = [
-  { name: "linesAdded", label: "Lines added", column: "lines_added", icon: Plus },
-  { name: "linesRemoved", label: "Lines removed", column: "lines_removed", icon: Minus },
-  { name: "filesChanged", label: "Files changed", column: "files_changed", icon: FileCode2 },
-  { name: "editEvents", label: "Edit events", column: "edit_events", icon: MousePointer2 },
-  { name: "projectsCount", label: "Projects worked on", column: "projects_count", icon: FolderKanban },
-  { name: "codingMinutes", label: "Coding time (minutes)", column: "coding_minutes", icon: Clock3 },
+  { name: "linesAdded", label: "Lines added", column: "lines_added" },
+  { name: "linesRemoved", label: "Lines removed", column: "lines_removed" },
+  { name: "filesChanged", label: "Files changed", column: "files_changed" },
+  { name: "editEvents", label: "Edit events", column: "edit_events" },
+  { name: "projectsCount", label: "Projects worked on", column: "projects_count" },
+  { name: "codingMinutes", label: "Coding time (minutes)", column: "coding_minutes" },
 ] as const;
 
 const inputClass =
-  "mt-2 h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-700 hover:border-white/15 focus:border-emerald-300/40 focus:ring-4 focus:ring-emerald-400/[0.06] disabled:cursor-not-allowed disabled:opacity-60";
+  "mt-2 h-11 w-full rounded-[3px] border border-[#34332c] bg-[#171712] px-3.5 text-sm text-[#edeae0] outline-none transition placeholder:text-[#68655d] hover:border-[#4a483f] focus:border-[#55a7ff] focus:ring-2 focus:ring-[#55a7ff]/20 disabled:cursor-not-allowed disabled:opacity-60";
 
 function createRow(): LanguageRow {
   return {
@@ -61,6 +56,7 @@ function createRow(): LanguageRow {
 export function ProfileForm({
   initialProfile,
   initialLanguages,
+  section,
 }: ProfileFormProps) {
   const router = useRouter();
   const [languages, setLanguages] = useState<LanguageRow[]>(
@@ -73,9 +69,6 @@ export function ProfileForm({
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [savedUsername, setSavedUsername] = useState(
-    initialProfile?.username ?? "",
-  );
 
   function updateLanguage(
     rowId: string,
@@ -102,19 +95,62 @@ export function ProfileForm({
 
     const formData = new FormData(event.currentTarget);
     const rawInput = {
-      username: formData.get("username"),
-      displayName: formData.get("displayName"),
-      bio: formData.get("bio"),
-      avatarUrl: formData.get("avatarUrl"),
-      githubUrl: formData.get("githubUrl"),
-      websiteUrl: formData.get("websiteUrl"),
-      linesAdded: formData.get("linesAdded"),
-      linesRemoved: formData.get("linesRemoved"),
-      filesChanged: formData.get("filesChanged"),
-      editEvents: formData.get("editEvents"),
-      projectsCount: formData.get("projectsCount"),
-      codingMinutes: formData.get("codingMinutes"),
-      languages,
+      username:
+        section === "identity"
+          ? formData.get("username")
+          : initialProfile?.username ?? "",
+      displayName:
+        section === "identity"
+          ? formData.get("displayName")
+          : initialProfile?.display_name ?? "",
+      bio:
+        section === "identity"
+          ? formData.get("bio")
+          : initialProfile?.bio ?? "",
+      avatarUrl:
+        section === "identity"
+          ? formData.get("avatarUrl")
+          : initialProfile?.avatar_url ?? "",
+      githubUrl:
+        section === "links"
+          ? formData.get("githubUrl")
+          : initialProfile?.github_url ?? "",
+      websiteUrl:
+        section === "links"
+          ? formData.get("websiteUrl")
+          : initialProfile?.website_url ?? "",
+      linesAdded:
+        section === "stats"
+          ? formData.get("linesAdded")
+          : initialProfile?.lines_added ?? 0,
+      linesRemoved:
+        section === "stats"
+          ? formData.get("linesRemoved")
+          : initialProfile?.lines_removed ?? 0,
+      filesChanged:
+        section === "stats"
+          ? formData.get("filesChanged")
+          : initialProfile?.files_changed ?? 0,
+      editEvents:
+        section === "stats"
+          ? formData.get("editEvents")
+          : initialProfile?.edit_events ?? 0,
+      projectsCount:
+        section === "stats"
+          ? formData.get("projectsCount")
+          : initialProfile?.projects_count ?? 0,
+      codingMinutes:
+        section === "stats"
+          ? formData.get("codingMinutes")
+          : initialProfile?.coding_minutes ?? 0,
+      languages:
+        section === "languages"
+          ? languages
+          : initialLanguages.map((language) => ({
+              rowId: language.id,
+              name: language.name,
+              percentage: String(language.percentage),
+            })),
     };
     const result = profileSchema.safeParse(rawInput);
 
@@ -126,7 +162,6 @@ export function ProfileForm({
       });
       setFieldErrors(nextErrors);
       setFeedback({
-        type: "error",
         message: "Review the highlighted fields, then try saving again.",
       });
       return;
@@ -163,22 +198,10 @@ export function ProfileForm({
         throw profileError;
       }
 
-      setSavedUsername(result.data.username);
-      setLanguages(
-        result.data.languages.map((language) => ({
-          rowId: language.rowId,
-          name: language.name,
-          percentage: String(language.percentage),
-        })),
-      );
-      setFeedback({
-        type: "success",
-        message: "Profile saved. Your public page is up to date.",
-      });
+      router.replace(`/u/${result.data.username}`);
       router.refresh();
     } catch (error) {
       setFeedback({
-        type: "error",
         message:
           error instanceof Error
             ? error.message
@@ -194,27 +217,28 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6">
-      <section className="rounded-2xl border border-white/[0.07] bg-[#0b0f0d] p-5 sm:p-7">
+    <form onSubmit={handleSubmit} noValidate className="space-y-12">
+      {section === "identity" && (
+      <section className="border-t border-[#2b2a24] pt-8">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-300/65">
-            Identity
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#55a7ff]">
+            01 / Identity
           </p>
-          <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-zinc-100">
+          <h2 className="mt-1.5 [font-family:Georgia,'Times_New_Roman',serif] text-2xl text-[#edeae0]">
             Public profile
           </h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">
+          <p className="mt-2 text-sm leading-6 text-[#969287]">
             Choose what people see when they open your profile.
           </p>
         </div>
 
         <div className="mt-7 grid gap-5 sm:grid-cols-2">
           <div>
-            <label htmlFor="username" className="text-sm font-medium text-zinc-300">
-              Username <span className="text-emerald-300">*</span>
+            <label htmlFor="username" className="font-mono text-xs text-[#c8c4b9]">
+              Username <span className="text-[#55a7ff]">*</span>
             </label>
             <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-[1.15rem] font-mono text-sm text-zinc-600">
+              <span className="pointer-events-none absolute left-3.5 top-[1.15rem] font-mono text-sm text-[#77746b]">
                 @
               </span>
               <input
@@ -233,11 +257,11 @@ export function ProfileForm({
               />
             </div>
             {errorFor("username") ? (
-              <p id="username-error" className="mt-1.5 text-xs text-rose-300">
+              <p id="username-error" className="mt-1.5 text-xs text-[#e58b83]">
                 {errorFor("username")}
               </p>
             ) : (
-              <p id="username-help" className="mt-1.5 text-xs text-zinc-700">
+              <p id="username-help" className="mt-1.5 text-xs text-[#77746b]">
                 3–30 lowercase characters; numbers, _ and - are allowed.
               </p>
             )}
@@ -255,7 +279,7 @@ export function ProfileForm({
         </div>
 
         <div className="mt-5">
-          <label htmlFor="bio" className="text-sm font-medium text-zinc-300">
+          <label htmlFor="bio" className="font-mono text-xs text-[#c8c4b9]">
             Bio
           </label>
           <textarea
@@ -268,20 +292,20 @@ export function ProfileForm({
             aria-invalid={Boolean(errorFor("bio"))}
             aria-describedby={errorFor("bio") ? "bio-error" : "bio-help"}
             placeholder="What do you build, and what do you care about?"
-            className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-700 hover:border-white/15 focus:border-emerald-300/40 focus:ring-4 focus:ring-emerald-400/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 w-full resize-y rounded-[3px] border border-[#34332c] bg-[#171712] px-3.5 py-3 text-sm leading-6 text-[#edeae0] outline-none transition placeholder:text-[#68655d] hover:border-[#4a483f] focus:border-[#55a7ff] focus:ring-2 focus:ring-[#55a7ff]/20 disabled:cursor-not-allowed disabled:opacity-60"
           />
           {errorFor("bio") ? (
-            <p id="bio-error" className="mt-1.5 text-xs text-rose-300">
+            <p id="bio-error" className="mt-1.5 text-xs text-[#e58b83]">
               {errorFor("bio")}
             </p>
           ) : (
-            <p id="bio-help" className="mt-1.5 text-xs text-zinc-700">
+            <p id="bio-help" className="mt-1.5 text-xs text-[#77746b]">
               Up to 280 characters.
             </p>
           )}
         </div>
 
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-5 sm:max-w-[calc(50%_-_0.625rem)]">
           <TextField
             id="avatarUrl"
             label="Avatar URL"
@@ -293,6 +317,25 @@ export function ProfileForm({
             disabled={isSaving}
             error={errorFor("avatarUrl")}
           />
+        </div>
+      </section>
+      )}
+
+      {section === "links" && (
+      <section className="border-t border-[#2b2a24] pt-8">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#55a7ff]">
+            02 / Links
+          </p>
+          <h2 className="mt-1.5 [font-family:Georgia,'Times_New_Roman',serif] text-2xl text-[#edeae0]">
+            Around the web
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[#969287]">
+            Add the destinations visitors should use to learn more about your work.
+          </p>
+        </div>
+
+        <div className="mt-7 grid gap-5 sm:grid-cols-2">
           <TextField
             id="githubUrl"
             label="GitHub URL"
@@ -304,31 +347,31 @@ export function ProfileForm({
             disabled={isSaving}
             error={errorFor("githubUrl")}
           />
-          <div className="sm:col-span-2">
-            <TextField
-              id="websiteUrl"
-              label="Personal website URL"
-              type="url"
-              inputMode="url"
-              placeholder="https://your-site.dev"
-              defaultValue={initialProfile?.website_url ?? ""}
-              maxLength={2048}
-              disabled={isSaving}
-              error={errorFor("websiteUrl")}
-            />
-          </div>
+          <TextField
+            id="websiteUrl"
+            label="Personal website URL"
+            type="url"
+            inputMode="url"
+            placeholder="https://your-site.dev"
+            defaultValue={initialProfile?.website_url ?? ""}
+            maxLength={2048}
+            disabled={isSaving}
+            error={errorFor("websiteUrl")}
+          />
         </div>
       </section>
+      )}
 
-      <section className="rounded-2xl border border-white/[0.07] bg-[#0b0f0d] p-5 sm:p-7">
+      {section === "stats" && (
+      <section className="border-t border-[#2b2a24] pt-8">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-300/65">
-            Aggregate data
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#55a7ff]">
+            03 / Coding statistics
           </p>
-          <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-zinc-100">
+          <h2 className="mt-1.5 [font-family:Georgia,'Times_New_Roman',serif] text-2xl text-[#edeae0]">
             Coding totals
           </h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">
+          <p className="mt-2 text-sm leading-6 text-[#969287]">
             Enter cumulative totals from any source you trust. Stack Stats does not
             collect code or track activity automatically.
           </p>
@@ -336,16 +379,14 @@ export function ProfileForm({
 
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {stats.map((stat) => {
-            const Icon = stat.icon;
             const value = initialProfile?.[stat.column] ?? 0;
 
             return (
               <div key={stat.name}>
                 <label
                   htmlFor={stat.name}
-                  className="flex items-center gap-2 text-xs font-medium text-zinc-400"
+                  className="font-mono text-xs text-[#aaa69a]"
                 >
-                  <Icon className="size-3.5 text-zinc-600" />
                   {stat.label}
                 </label>
                 <input
@@ -364,7 +405,7 @@ export function ProfileForm({
                   className={`${inputClass} font-mono`}
                 />
                 {errorFor(stat.name) && (
-                  <p id={`${stat.name}-error`} className="mt-1.5 text-xs text-rose-300">
+                  <p id={`${stat.name}-error`} className="mt-1.5 text-xs text-[#e58b83]">
                     {errorFor(stat.name)}
                   </p>
                 )}
@@ -373,17 +414,19 @@ export function ProfileForm({
           })}
         </div>
       </section>
+      )}
 
-      <section className="rounded-2xl border border-white/[0.07] bg-[#0b0f0d] p-5 sm:p-7">
+      {section === "languages" && (
+      <section className="border-t border-[#2b2a24] pt-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-300/65">
-              Breakdown
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#55a7ff]">
+              04 / Language activity
             </p>
-            <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-zinc-100">
+            <h2 className="mt-1.5 [font-family:Georgia,'Times_New_Roman',serif] text-2xl text-[#edeae0]">
               Languages
             </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-600">
+            <p className="mt-2 text-sm leading-6 text-[#969287]">
               Optional. If added, percentages must total 100%.
             </p>
           </div>
@@ -391,7 +434,7 @@ export function ProfileForm({
             type="button"
             onClick={() => setLanguages((current) => [...current, createRow()])}
             disabled={isSaving || languages.length >= 12}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-[3px] border border-[#3b3931] px-3.5 font-mono text-xs text-[#c8c4b9] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="size-4" />
             Add language
@@ -399,7 +442,7 @@ export function ProfileForm({
         </div>
 
         {errorFor("languages") && (
-          <p className="mt-4 flex items-center gap-2 text-sm text-rose-300" role="alert">
+          <p className="mt-4 flex items-center gap-2 text-sm text-[#e58b83]" role="alert">
             <AlertCircle className="size-4 shrink-0" />
             {errorFor("languages")}
           </p>
@@ -414,13 +457,13 @@ export function ProfileForm({
               return (
                 <fieldset
                   key={language.rowId}
-                  className="grid gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:grid-cols-[1fr_9rem_auto] sm:items-start"
+                  className="grid gap-3 border-b border-[#2b2a24] py-4 sm:grid-cols-[1fr_9rem_auto] sm:items-start"
                 >
                   <legend className="sr-only">Language {index + 1}</legend>
                   <div>
                     <label
                       htmlFor={`language-name-${language.rowId}`}
-                      className="text-xs font-medium text-zinc-500"
+                      className="font-mono text-[11px] text-[#969287]"
                     >
                       Language
                     </label>
@@ -443,7 +486,7 @@ export function ProfileForm({
                     {nameError && (
                       <p
                         id={`language-name-error-${language.rowId}`}
-                        className="mt-1.5 text-xs text-rose-300"
+                        className="mt-1.5 text-xs text-[#e58b83]"
                       >
                         {nameError}
                       </p>
@@ -452,7 +495,7 @@ export function ProfileForm({
                   <div>
                     <label
                       htmlFor={`language-percentage-${language.rowId}`}
-                      className="text-xs font-medium text-zinc-500"
+                      className="font-mono text-[11px] text-[#969287]"
                     >
                       Percentage
                     </label>
@@ -482,14 +525,14 @@ export function ProfileForm({
                         placeholder="50"
                         className={`${inputClass} pr-8 font-mono`}
                       />
-                      <span className="pointer-events-none absolute right-3 top-[1.15rem] text-sm text-zinc-600">
+                      <span className="pointer-events-none absolute right-3 top-[1.15rem] text-sm text-[#77746b]">
                         %
                       </span>
                     </div>
                     {percentageError && (
                       <p
                         id={`language-percentage-error-${language.rowId}`}
-                        className="mt-1.5 text-xs text-rose-300"
+                        className="mt-1.5 text-xs text-[#e58b83]"
                       >
                         {percentageError}
                       </p>
@@ -500,7 +543,7 @@ export function ProfileForm({
                     onClick={() => removeLanguage(language.rowId)}
                     disabled={isSaving}
                     aria-label={`Remove ${language.name || `language ${index + 1}`}`}
-                    className="mt-5 inline-flex size-11 items-center justify-center rounded-xl border border-white/[0.07] text-zinc-600 transition hover:border-rose-300/20 hover:bg-rose-400/[0.06] hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-5 inline-flex size-11 items-center justify-center rounded-[3px] border border-[#34332c] text-[#77746b] transition hover:border-[#8d4f49] hover:text-[#e58b83] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e58b83] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Trash2 className="size-4" />
                   </button>
@@ -509,56 +552,49 @@ export function ProfileForm({
             })}
           </div>
         ) : (
-          <div className="mt-6 rounded-xl border border-dashed border-white/[0.08] px-5 py-8 text-center">
-            <p className="text-sm text-zinc-600">No languages added yet.</p>
+          <div className="mt-6 border border-dashed border-[#34332c] px-5 py-8 text-center">
+            <p className="text-sm text-[#858177]">No languages added yet.</p>
           </div>
         )}
       </section>
+      )}
 
-      <div className="sticky bottom-3 z-10 rounded-2xl border border-white/10 bg-[#0b0f0d]/95 p-3 shadow-[0_15px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:flex sm:items-center sm:justify-between">
+      <div className="sticky bottom-0 z-10 border border-[#34332c] bg-[#11110d] p-3 sm:flex sm:items-center sm:justify-between">
         <div className="min-w-0" aria-live="polite">
           {feedback ? (
             <p
-              className={`flex items-start gap-2 text-sm ${
-                feedback.type === "success" ? "text-emerald-300" : "text-rose-300"
-              }`}
-              role={feedback.type === "error" ? "alert" : "status"}
+              className="flex items-start gap-2 text-sm text-[#e58b83]"
+              role="alert"
             >
-              {feedback.type === "success" ? (
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-              ) : (
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              )}
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
               <span>{feedback.message}</span>
             </p>
           ) : (
-            <p className="px-1 text-xs text-zinc-700">
+            <p className="px-1 text-xs text-[#77746b]">
               Saved profiles are publicly readable.
             </p>
           )}
         </div>
         <div className="mt-3 flex shrink-0 gap-2 sm:mt-0 sm:pl-4">
-          {savedUsername && (
-            <Link
-              href={`/u/${savedUsername}`}
-              target="_blank"
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:flex-none"
-            >
-              View profile
-              <ExternalLink className="size-4" />
-            </Link>
-          )}
+          <Link
+            href={
+              initialProfile ? `/u/${initialProfile.username}` : "/dashboard"
+            }
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[3px] border border-[#3b3931] px-4 font-mono text-xs text-[#c8c4b9] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] sm:flex-none"
+          >
+            Cancel
+          </Link>
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-300 px-5 text-sm font-semibold text-[#07110d] transition hover:bg-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0f0d] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[3px] bg-[#55a7ff] px-5 font-mono text-xs font-semibold text-[#0b1722] transition hover:bg-[#78b8ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#11110d] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
           >
             {isSaving ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
               <Save className="size-4" />
             )}
-            {isSaving ? "Saving…" : "Save profile"}
+            {isSaving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
@@ -591,7 +627,7 @@ function TextField({
 }: TextFieldProps) {
   return (
     <div>
-      <label htmlFor={id} className="text-sm font-medium text-zinc-300">
+      <label htmlFor={id} className="font-mono text-xs text-[#c8c4b9]">
         {label}
       </label>
       <input
@@ -608,7 +644,7 @@ function TextField({
         className={inputClass}
       />
       {error && (
-        <p id={`${id}-error`} className="mt-1.5 text-xs text-rose-300">
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-[#e58b83]">
           {error}
         </p>
       )}

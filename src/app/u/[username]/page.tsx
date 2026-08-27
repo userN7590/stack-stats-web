@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ProfileView } from "@/components/profile/profile-view";
+import {
+  defaultBackgroundStyle,
+  defaultDisplayFont,
+} from "@/lib/appearance";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProfileLanguage } from "@/lib/types";
 
@@ -36,11 +40,17 @@ export default async function PublicProfilePage({
     notFound();
   }
 
-  const { data: languages, error: languageError } = await supabase
-    .from("profile_languages")
-    .select("*")
-    .eq("user_id", profile.user_id)
-    .order("percentage", { ascending: false });
+  const [
+    { data: languages, error: languageError },
+    { data: claimsData },
+  ] = await Promise.all([
+    supabase
+      .from("profile_languages")
+      .select("*")
+      .eq("user_id", profile.user_id)
+      .order("percentage", { ascending: false }),
+    supabase.auth.getClaims(),
+  ]);
 
   if (languageError) {
     throw new Error(languageError.message);
@@ -50,8 +60,11 @@ export default async function PublicProfilePage({
     <ProfileView
       profile={{
         ...(profile as Profile),
+        display_font: profile.display_font ?? defaultDisplayFont,
+        background_style: profile.background_style ?? defaultBackgroundStyle,
         languages: (languages as ProfileLanguage[] | null) ?? [],
       }}
+      isOwner={claimsData?.claims?.sub === profile.user_id}
     />
   );
 }

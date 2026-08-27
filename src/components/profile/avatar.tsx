@@ -13,7 +13,7 @@ export function Avatar({ name, src }: AvatarProps) {
   const [hasError, setHasError] = useState(false);
 
   return (
-    <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-300/20 to-cyan-400/5 font-mono text-2xl font-semibold text-emerald-200 shadow-[0_20px_60px_rgba(0,0,0,0.4)] sm:size-28">
+    <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-[4px] border border-[#34332c] bg-[#191914] font-mono text-2xl font-medium text-[#55a7ff] sm:size-28">
       {src && !hasError ? (
         // User-provided avatar hosts cannot be known at build time.
         // eslint-disable-next-line @next/next/no-img-element
