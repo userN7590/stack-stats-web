@@ -1,4 +1,10 @@
-import { ArrowRight, ExternalLink } from "lucide-react";
+import {
+  ArrowRight,
+  ExternalLink,
+  LogIn,
+  UserPlus,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -74,9 +80,17 @@ export default async function Home() {
             <>
               <Link
                 href={profileUsername ? `/u/${profileUsername}` : "/dashboard"}
-                className="border border-[#3b3931] px-3 py-2 text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                aria-label={profileUsername ? "Your profile" : "Set up profile"}
+                className="inline-flex size-10 items-center justify-center border border-[#3b3931] text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] sm:h-auto sm:w-auto sm:px-3 sm:py-2"
               >
-                {profileUsername ? "Your profile" : "Set up profile"}
+                {profileUsername ? (
+                  <UserRound className="size-4 sm:hidden" />
+                ) : (
+                  <UserPlus className="size-4 sm:hidden" />
+                )}
+                <span className="sr-only sm:not-sr-only">
+                  {profileUsername ? "Your profile" : "Set up profile"}
+                </span>
               </Link>
               <LogoutButton />
             </>
@@ -84,15 +98,19 @@ export default async function Home() {
             <>
               <Link
                 href="/login"
-                className="text-[#aaa69a] transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                aria-label="Log in"
+                className="inline-flex size-10 items-center justify-center text-[#aaa69a] transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] sm:size-auto"
               >
-                Log in
+                <LogIn className="size-4 sm:hidden" />
+                <span className="sr-only sm:not-sr-only">Log in</span>
               </Link>
               <Link
                 href="/signup"
-                className="border border-[#3b3931] px-3 py-2 text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                aria-label="Create profile"
+                className="inline-flex size-10 items-center justify-center border border-[#3b3931] text-[#edeae0] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] sm:h-auto sm:w-auto sm:px-3 sm:py-2"
               >
-                Create profile
+                <UserPlus className="size-4 sm:hidden" />
+                <span className="sr-only sm:not-sr-only">Create profile</span>
               </Link>
             </>
           )}

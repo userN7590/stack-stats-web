@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Pencil } from "lucide-react";
+import { ArrowLeft, ExternalLink, Pencil, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -71,10 +71,17 @@ export function ProfileView({
         ) : (
           <Link
             href={isExample ? "/" : "/signup"}
-            className="inline-flex items-center gap-2 font-mono text-xs text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+            aria-label={isExample ? "Back home" : "Create your profile"}
+            className="inline-flex size-10 items-center justify-center gap-2 font-mono text-xs text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#edeae0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] sm:size-auto"
           >
-            {isExample && <ArrowLeft className="size-3.5" />}
-            {isExample ? "Back home" : "Create your profile"}
+            {isExample ? (
+              <ArrowLeft className="size-3.5" />
+            ) : (
+              <UserPlus className="size-4 sm:hidden" />
+            )}
+            <span className={isExample ? "" : "sr-only sm:not-sr-only"}>
+              {isExample ? "Back home" : "Create your profile"}
+            </span>
           </Link>
         )}
       </AppNavbar>
