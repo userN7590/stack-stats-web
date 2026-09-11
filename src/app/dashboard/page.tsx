@@ -145,6 +145,7 @@ export default async function DashboardPage({
           </p>
         </header>
 
+        {typedProfile && <Link className="mb-8 block text-sm text-[#55a7ff] underline" href="/settings/sync">Manage synced statistics and publication</Link>}
         {!typedProfile && !section ? (
           <section className="border-y border-[#2b2a24] py-9 sm:py-12">
             <div className="max-w-2xl border-l-2 border-[#55a7ff] pl-5 sm:pl-7">

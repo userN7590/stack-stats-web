@@ -13,12 +13,14 @@ import { FormEvent, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, ProfileLanguage } from "@/lib/types";
+import { safeAuthDestination } from "@/lib/auth-destination";
 import { profileSchema } from "@/lib/validation";
 
 type ProfileFormProps = {
   initialProfile: Profile | null;
   initialLanguages: ProfileLanguage[];
   section: ProfileFormSection;
+  successDestination?: string;
 };
 
 export type ProfileFormSection = "identity" | "links" | "stats" | "languages";
@@ -57,6 +59,7 @@ export function ProfileForm({
   initialProfile,
   initialLanguages,
   section,
+  successDestination,
 }: ProfileFormProps) {
   const router = useRouter();
   const [languages, setLanguages] = useState<LanguageRow[]>(
@@ -198,7 +201,7 @@ export function ProfileForm({
         throw profileError;
       }
 
-      router.replace(`/u/${result.data.username}`);
+      router.replace(successDestination ? safeAuthDestination(successDestination) : `/u/${result.data.username}`);
       router.refresh();
     } catch (error) {
       setFeedback({
