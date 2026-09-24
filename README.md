@@ -1,17 +1,19 @@
 # Stack Stats
 
-Stack Stats is a public developer-profile application for presenting manually
-entered, self-reported aggregate coding statistics. Developers can create an
-account, publish an identity and links, maintain development totals and a
-language breakdown, and share a responsive profile at `/u/[username]`.
+Stack Stats is a public developer-profile application for manually entered coding
+statistics and optional daily summaries from the local-first VS Code extension.
+Developers can publish an identity and links, maintain development totals and a
+language breakdown, and share a profile at `/u/[username]`.
 
-Stack Stats does **not** read source code, ingest repositories, or automatically
-track development activity. Profile owners decide which aggregate values to
-enter and make public.
+The web app does **not** read source code or ingest repositories. Extension
+uploads require separate consent, stay private by default, and only appear on a
+public profile when its owner enables publication. Manual profile data remains
+supported.
 
 - **Live application:** [https://stackstats.dev](https://stackstats.dev)
 - **Public example profile:** [https://stackstats.dev/u/fil](https://stackstats.dev/u/fil)
 - **Technical discussion:** [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md)
+- **Production auth/sync rollout:** [exact v0.5.0 deployment and E2E checklist](docs/PRODUCTION_AUTH_SYNC.md)
 
 ## Features
 
@@ -25,6 +27,14 @@ enter and make public.
 - Five constrained display-font presets and five subtle background presets
 - Authentication-aware landing navigation and a live `/u/fil` profile preview
 - Loading, validation, empty, error, and not-found states
+
+## Optional VS Code account linking
+
+The existing Supabase login/signup and profile setup now support a secure editor approval flow at `/extension/connect`. It returns a single-use, S256 PKCE-bound code to VS Code, then exchanges it for identity-only device credentials over HTTPS. Browser Supabase tokens are never put in the editor callback. Connecting alone does not upload telemetry. A separate stats:write approval enables private daily aggregates; see [optional aggregate synchronization](docs/SYNC.md).
+
+Apply `supabase/migrations/20260909000000_extension_identity.sql` after the existing migrations. It adds private hash-only grant/device/access tables and narrowly scoped functions; no service-role key is needed. Existing profiles/statistics are preserved. Set `STACK_STATS_APP_ORIGIN` to the exact application origin (production defaults to `https://stackstats.dev`; local development uses `http://localhost:3000`). Optional `STACK_STATS_EXTENSION_REDIRECT_URIS` is a JSON array of additional exact trusted editor callback URIs. See [extension authentication architecture and F5 testing](docs/EXTENSION_AUTH.md) for callback/email configuration, database tests, lifetimes, revocation, and security tradeoffs.
+
+Logged-in users can visit `/extension/connect` without query parameters to revoke all editor connections. This is independent of browser logout and does not delete accounts or local editor history.
 
 ## Technology stack
 
@@ -79,9 +89,11 @@ The versioned schema lives in:
 ```text
 supabase/migrations/20260827000000_create_stack_stats.sql
 supabase/migrations/20260827000100_add_profile_appearance.sql
+supabase/migrations/20260909000000_extension_identity.sql
+supabase/migrations/20260910000000_profile_sync.sql
 ```
 
-Apply both files in timestamp order. The second migration preserves existing
+Apply pending migration files in timestamp order. The appearance migration preserves existing
 profiles by adding safe `editorial` and `none` defaults.
 
 ## Authentication and authorization
@@ -135,6 +147,7 @@ supports projects where email confirmation is enabled.
    ```dotenv
    NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+   STACK_STATS_APP_ORIGIN=http://localhost:3000
    ```
 
    Never place the service-role key, database password, or other private
@@ -147,7 +160,7 @@ supports projects where email confirmation is enabled.
    npx supabase db push
    ```
 
-   Alternatively, open **SQL Editor** in the Supabase dashboard and run both
+   Alternatively, open **SQL Editor** in the Supabase dashboard and run the
    files from `supabase/migrations` in filename order.
 
 5. In **Authentication → URL Configuration**, configure:
@@ -158,6 +171,8 @@ supports projects where email confirmation is enabled.
 
    Redirect URL: http://localhost:3000/auth/callback?next=/dashboard
    Redirect URL: https://stackstats.dev/auth/callback?next=/dashboard
+   Redirect URL: http://localhost:3000/auth/callback?next=**
+   Redirect URL: https://stackstats.dev/auth/callback?next=**
    ```
 
    Use the Site URL appropriate to the project/environment and include both
@@ -180,14 +195,15 @@ Run the focused unit suite:
 
 ```bash
 npm test
+npm run test:db # Docker; creates and removes an isolated database
 ```
 
 Run the static and production checks:
 
 ```bash
 npm run lint
-npx tsc --noEmit
 npm run build
+npx tsc --noEmit
 ```
 
 The tests import the production Zod schemas and formatting utilities directly.
@@ -196,34 +212,39 @@ presets, coding-time formatting, and related formatting edge cases.
 
 ## Optional Vercel deployment
 
-1. Push the repository to GitHub and import it into Vercel.
-2. Add `NEXT_PUBLIC_SUPABASE_URL` and
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the required Vercel environments.
-3. Apply both migrations to the production Supabase project.
-4. Set the Supabase Site URL to the production domain and allow the production
-   callback URL shown above.
-5. Deploy. No service-role credential or custom server is required.
+Follow the [production rollout checklist](docs/PRODUCTION_AUTH_SYNC.md): configure
+the hosted project variables and auth redirects, apply pending migrations and
+verify permissions, then deploy the web release. Apply the database changes
+before pushing to an automatically deployed production branch. After deployment
+run `npm run check:production` and the documented browser/editor E2E test.
+No service-role credential or custom server is required.
 
 ## Known limitations
 
-- All coding statistics are manual and self-reported; there is no source-code
-  access, repository ingestion, or automatic tracking.
-- Statistics represent current aggregate totals, not historical snapshots.
+- Manual statistics remain supported. Optional editor daily summaries are self-reported collector data, with separate private-upload and public-publication consent. No source-code access or repository ingestion occurs.
+- Manual statistics are current totals. Optional synced daily records support private 7/30/90-day and lifetime queries; cross-device overlapping work cannot yet be deduplicated.
 - Avatars use external HTTPS URLs; there is no image upload pipeline.
 - Authentication is email/password only. Password recovery and social OAuth are
   not part of this MVP.
-- The automated suite covers pure validation and formatting logic. It does not
-  currently include browser E2E tests or isolated Supabase integration tests.
+- Automated tests cover validation, formatting, auth, sync endpoints and publication precedence. Disposable SQL suites verify PKCE, rotation, ownership, revisions, privacy and aggregation. Full browser account linking still needs staging E2E verification.
 - Appearance is intentionally limited to curated presets rather than arbitrary
   CSS, colors, fonts, images, or executable content.
 
 ## Future improvements
 
-- A Stack Stats CLI and VS Code extension
-- Privacy-conscious automatic collection of aggregate statistics without source
-  content ingestion
+- Cloud deletion/export, granular publication controls and sync staging E2E coverage
 - Historical trends and expanded analytics
 - OAuth and social login
 - Managed avatar/image uploads
 - Password recovery, email preference, and notification improvements
 - Browser E2E tests and Supabase integration tests in a separate staging project
+
+## Optional aggregate synchronization
+
+Apply `supabase/migrations/20260910000000_profile_sync.sql` after the existing identity migration. No service-role key or manual-profile rewrite is needed. Existing identity grants remain unchanged; new stats:write grants require browser approval and use recoverable refresh-token rotation. Daily PUTs derive the owner from credentials and are idempotent by account/installation/date/revision.
+
+Uploads stay private. `/settings/sync` explicitly selects whether synced lifetime totals replace the displayed manual profile and whether synced languages are public. Project aliases and historical dates are private. Owners can inspect `GET /api/v1/sync/summary?period=7|30|90|lifetime` with the existing browser session. Upload credentials cannot edit publication, identity or manual profile data.
+
+The new schema has private `sync_installations`, `sync_days`, `sync_privacy`, `sync_rate_limits` and refresh-token history tables. It enforces strict daily field/counter/size constraints, quota and revision rules in PostgreSQL as well as HTTP validation. SQL fixtures are in `supabase/tests/profile_sync.sql` and `supabase/tests/extension_identity.sql`; use a disposable migrated DB only.
+
+See [SYNC.md](docs/SYNC.md) for exact payload, routes, consent, 90-day initial history, retry behavior, multi-device limits, security details, F5 staging procedure, benchmark and next steps. The contract in `src/lib/sync-contract.ts` is an exact vendored copy of the extension protocol package; update both together and run the parity checker documented there.

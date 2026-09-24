@@ -47,9 +47,9 @@ export function ProfileView({
   const stats = [
     ["Lines added", formatNumber(profile.lines_added)],
     ["Lines removed", formatNumber(profile.lines_removed)],
-    ["Files changed", formatNumber(profile.files_changed)],
+    [profile.stats_source === "synced" ? "File-days" : "Files changed", formatNumber(profile.files_changed)],
     ["Edit events", formatNumber(profile.edit_events)],
-    ["Projects", formatNumber(profile.projects_count)],
+    [profile.stats_source === "synced" ? "Project identities" : "Projects", formatNumber(profile.projects_count)],
     ["Coding time", formatCodingTime(profile.coding_minutes)],
   ];
 
@@ -192,11 +192,11 @@ export function ProfileView({
             </div>
             <div className="flex items-center gap-4">
               <p className="font-mono text-[11px] text-[#858177]">
-                Updated {formatDate(profile.updated_at)}
+                {profile.stats_source === "synced" ? "Synced" : "Updated"} {formatDate(profile.updated_at)}
               </p>
               {isOwner && (
                 <OwnerEditLink
-                  href="/dashboard?section=stats"
+                  href={profile.stats_source === "synced" ? "/settings/sync" : "/dashboard?section=stats"}
                   label="Edit totals"
                 />
               )}
@@ -290,7 +290,7 @@ export function ProfileView({
               </div>
               {isOwner && (
                 <OwnerEditLink
-                  href="/dashboard?section=languages"
+                  href={profile.stats_source === "synced" ? "/settings/sync" : "/dashboard?section=languages"}
                   label="Edit languages"
                 />
               )}

@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { confirmationCallbackPath, safeAuthDestination } from "@/lib/auth-destination";
 import { authSchema } from "@/lib/validation";
 
 type AuthFormProps = {
   mode: "login" | "signup";
   initialError?: string;
+  next?: string;
 };
 
 type Feedback = {
@@ -18,8 +20,9 @@ type Feedback = {
   message: string;
 } | null;
 
-export function AuthForm({ mode, initialError }: AuthFormProps) {
+export function AuthForm({ mode, initialError, next }: AuthFormProps) {
   const router = useRouter();
+  const destination = safeAuthDestination(next);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(
     initialError ? { type: "error", message: initialError } : null,
@@ -60,14 +63,14 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
           email: result.data.email,
           password: result.data.password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+            emailRedirectTo: `${window.location.origin}${confirmationCallbackPath(destination)}`,
           },
         });
 
         if (error) throw error;
 
         if (data.session) {
-          router.replace("/dashboard");
+          router.replace(destination);
           router.refresh();
           return;
         }
@@ -75,7 +78,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
         setFeedback({
           type: "success",
           message:
-            "Check your email to confirm your account. After confirmation, you’ll be sent to your dashboard.",
+            "Check your email to confirm your account. After confirmation, you’ll return to Stack Stats to continue.",
         });
         form.reset();
       } else {
@@ -86,7 +89,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
 
         if (error) throw error;
 
-        router.replace("/dashboard");
+        router.replace(destination);
         router.refresh();
       }
     } catch (error) {
@@ -225,7 +228,7 @@ export function AuthForm({ mode, initialError }: AuthFormProps) {
       <p className="mt-6 text-center text-sm text-[#858177]">
         {isSignup ? "Already have an account?" : "New to Stack Stats?"}{" "}
         <Link
-          href={isSignup ? "/login" : "/signup"}
+          href={`${isSignup ? "/login" : "/signup"}?next=${encodeURIComponent(destination)}`}
           className="text-[#c8c4b9] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
         >
           {isSignup ? "Log in" : "Create an account"}

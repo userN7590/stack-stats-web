@@ -1,5 +1,9 @@
 # Stack Stats: Technical Overview
 
+For the current extension v0.5.0 production path, see the
+[production auth/sync audit and deployment checklist](PRODUCTION_AUTH_SYNC.md).
+The assessment discussion below describes the original manual-profile baseline.
+
 ## Problem and product concept
 
 Developer work is difficult to summarize in one public, readable place. Source
@@ -233,3 +237,8 @@ Additional future work includes historical snapshots and trend analytics,
 OAuth/social login, managed image uploads, password recovery, improved email and
 notification flows, richer export options, and broader automated integration
 coverage.
+
+
+## Optional editor identity delegation
+
+The existing Supabase authentication and profile model now support VS Code account linking through `/extension/connect` and `/api/extension/*`. This is identity-only authorization; manually entered statistics and their write policies are unchanged. Read [EXTENSION_AUTH.md](EXTENSION_AUTH.md) for the protocol, SQL grants/RLS, credential lifetimes, tests, and deployment requirements.

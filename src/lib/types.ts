@@ -29,5 +29,6 @@ export type ProfileLanguage = {
 };
 
 export type PublicProfile = Profile & {
+  stats_source?: "synced";
   languages: ProfileLanguage[];
 };

@@ -7,7 +7,9 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:db": "node scripts/test-database.mjs",
+    "check:production": "node scripts/check-production.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

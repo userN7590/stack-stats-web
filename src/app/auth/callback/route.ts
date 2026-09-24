@@ -1,27 +1,17 @@
 import { NextResponse } from "next/server";
+import { safeAuthDestination } from "@/lib/auth-destination";
+import { appOrigin, privateHeaders } from "@/lib/extension-auth";
 
 import { createClient } from "@/lib/supabase/server";
-
-function getSafeDestination(origin: string, requestedPath: string | null) {
-  const fallback = new URL("/dashboard", origin);
-
-  if (!requestedPath?.startsWith("/")) {
-    return fallback;
-  }
-
-  const destination = new URL(requestedPath, origin);
-
-  return destination.origin === origin ? destination : fallback;
-}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const flowId = requestUrl.searchParams.get("sb_flow_id");
-  const destination = getSafeDestination(
-    requestUrl.origin,
-    requestUrl.searchParams.get("next"),
-  );
+  // Use the configured public origin even when the hosting proxy presents an
+  // internal host. Never trust forwarded host headers for auth redirects.
+  const origin = appOrigin();
+  const destination = new URL(safeAuthDestination(requestUrl.searchParams.get("next")), origin);
 
   if (code) {
     try {
@@ -32,15 +22,16 @@ export async function GET(request: Request) {
       );
 
       if (!error) {
-        return NextResponse.redirect(destination);
+        return NextResponse.redirect(destination, { headers: privateHeaders });
       }
     } catch {
       // Fall through to a non-sensitive error state on the login page.
     }
   }
 
-  const loginUrl = new URL("/login", requestUrl.origin);
+  const loginUrl = new URL("/login", origin);
   loginUrl.searchParams.set("error", "confirmation");
+  loginUrl.searchParams.set("next", `${destination.pathname}${destination.search}`);
 
-  return NextResponse.redirect(loginUrl);
+  return NextResponse.redirect(loginUrl, { headers: privateHeaders });
 }

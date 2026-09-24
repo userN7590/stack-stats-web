@@ -1,3 +1,4 @@
+import { withSyncedProfile } from "@/lib/synced-profile";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -56,14 +57,17 @@ export default async function PublicProfilePage({
     throw new Error(languageError.message);
   }
 
+  const synced = await supabase.rpc("sync_public_profile", { p_username: normalizedUsername });
+  // Fail closed on the new data source: never expose private rows. Manual
+  // values remain available during a rolling deployment or service outage.
   return (
     <ProfileView
-      profile={{
+      profile={withSyncedProfile({
         ...(profile as Profile),
         display_font: profile.display_font ?? defaultDisplayFont,
         background_style: profile.background_style ?? defaultBackgroundStyle,
         languages: (languages as ProfileLanguage[] | null) ?? [],
-      }}
+      }, synced.error ? null : synced.data)}
       isOwner={claimsData?.claims?.sub === profile.user_id}
     />
   );
