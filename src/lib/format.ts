@@ -1,7 +1,15 @@
 const numberFormatter = new Intl.NumberFormat("en-US");
+const percentageFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 1,
+});
 
 export function formatNumber(value: number) {
   return numberFormatter.format(value);
+}
+
+/** Accepts a percentage on the 0–100 scale; rounds only the displayed text. */
+export function formatPercentage(value: number) {
+  return `${percentageFormatter.format(value)}%`;
 }
 
 export function formatCodingTime(totalMinutes: number) {

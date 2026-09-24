@@ -29,6 +29,14 @@ const profileSections: ProfileSection[] = [
   "appearance",
 ];
 
+const sectionLabels: Record<ProfileSection, string> = {
+  identity: "Identity",
+  links: "Links",
+  stats: "Manual totals",
+  languages: "Manual languages",
+  appearance: "Appearance",
+};
+
 const sectionContent: Record<
   ProfileSection,
   { eyebrow: string; title: string; description: string }
@@ -145,7 +153,28 @@ export default async function DashboardPage({
           </p>
         </header>
 
-        {typedProfile && <Link className="mb-8 block text-sm text-[#55a7ff] underline" href="/settings/sync">Manage synced statistics and publication</Link>}
+        {typedProfile && (
+          <>
+            <nav
+              aria-label="Profile settings"
+              className="mb-6 flex flex-wrap gap-x-5 gap-y-3 border-y border-[#2b2a24] py-4 font-mono text-xs"
+            >
+              {profileSections.map((item) => (
+                <Link
+                  key={item}
+                  href={`/dashboard?section=${item}`}
+                  aria-current={item === section ? "page" : undefined}
+                  className={`underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] ${item === section ? "text-[#55a7ff]" : "text-[#aaa69a]"}`}
+                >
+                  {sectionLabels[item]}
+                </Link>
+              ))}
+            </nav>
+            <Link className="mb-8 block text-sm text-[#55a7ff] underline" href="/settings/sync">
+              Manage synced statistics and publication
+            </Link>
+          </>
+        )}
         {!typedProfile && !section ? (
           <section className="border-y border-[#2b2a24] py-9 sm:py-12">
             <div className="max-w-2xl border-l-2 border-[#55a7ff] pl-5 sm:pl-7">

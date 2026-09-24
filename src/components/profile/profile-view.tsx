@@ -31,6 +31,7 @@ export function ProfileView({
   isOwner = false,
 }: ProfileViewProps) {
   const name = profile.display_name || profile.username;
+  const isSynced = profile.stats_source === "synced";
   const displayFontClass = getDisplayFontClass(profile.display_font);
   const backgroundStyle = normalizeBackgroundStyle(profile.background_style);
   const hasStatistics = [
@@ -47,9 +48,9 @@ export function ProfileView({
   const stats = [
     ["Lines added", formatNumber(profile.lines_added)],
     ["Lines removed", formatNumber(profile.lines_removed)],
-    [profile.stats_source === "synced" ? "File-days" : "Files changed", formatNumber(profile.files_changed)],
+    [isSynced ? "File-days" : "Files changed", formatNumber(profile.files_changed)],
     ["Edit events", formatNumber(profile.edit_events)],
-    [profile.stats_source === "synced" ? "Project identities" : "Projects", formatNumber(profile.projects_count)],
+    [isSynced ? "Project identities" : "Projects", formatNumber(profile.projects_count)],
     ["Coding time", formatCodingTime(profile.coding_minutes)],
   ];
 
@@ -104,16 +105,21 @@ export function ProfileView({
                 >
                   {name}
                 </h1>
-                {isOwner && (
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <OwnerEditLink
+                {isOwner && !isExample && (
+                  <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 sm:flex-col sm:items-end">
+                    <Link
                       href="/dashboard?section=identity"
-                      label="Edit profile"
-                    />
-                    <OwnerEditLink
-                      href="/dashboard?section=appearance"
-                      label="Edit appearance"
-                    />
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-[3px] border border-[#3b3931] px-2.5 font-mono text-[10px] text-[#aaa69a] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                    >
+                      <Pencil className="size-3" aria-hidden="true" />
+                      Customize profile
+                    </Link>
+                    <Link
+                      href="/settings/sync"
+                      className="inline-flex min-h-8 items-center font-mono text-[10px] text-[#858177] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                    >
+                      Sync settings
+                    </Link>
                   </div>
                 )}
               </div>
@@ -127,50 +133,36 @@ export function ProfileView({
                 </p>
               )}
 
-              {(profile.github_url || profile.website_url || isOwner) && (
+              {(profile.github_url || profile.website_url) && (
                 <div className="mt-6 border-t border-[#2b2a24] pt-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#858177]">
-                      Links
-                    </p>
-                    {isOwner && (
-                      <OwnerEditLink
-                        href="/dashboard?section=links"
-                        label="Edit links"
-                      />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#858177]">
+                    Links
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs">
+                    {profile.github_url && (
+                      <a
+                        href={profile.github_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[#c8c4b9] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                      >
+                        GitHub <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                    {profile.website_url && (
+                      <a
+                        href={profile.website_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 items-center gap-1.5 text-[#c8c4b9] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+                      >
+                        <span className="max-w-56 truncate">
+                          {getHostname(profile.website_url)}
+                        </span>
+                        <ExternalLink className="size-3 shrink-0" />
+                      </a>
                     )}
                   </div>
-                  {profile.github_url || profile.website_url ? (
-                    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs">
-                      {profile.github_url && (
-                        <a
-                          href={profile.github_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-[#c8c4b9] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-                        >
-                          GitHub <ExternalLink className="size-3" />
-                        </a>
-                      )}
-                      {profile.website_url && (
-                        <a
-                          href={profile.website_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex min-w-0 items-center gap-1.5 text-[#c8c4b9] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-                        >
-                          <span className="max-w-56 truncate">
-                            {getHostname(profile.website_url)}
-                          </span>
-                          <ExternalLink className="size-3 shrink-0" />
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-[#858177]">
-                      No links added yet.
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -181,7 +173,9 @@ export function ProfileView({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#969287]">
-                Self-reported aggregate data
+                {isSynced
+                  ? "Automatically tracked by Stack Stats"
+                  : "Self-reported aggregate data"}
               </p>
               <h2
                 id="coding-stats-heading"
@@ -190,17 +184,9 @@ export function ProfileView({
                 Development totals
               </h2>
             </div>
-            <div className="flex items-center gap-4">
-              <p className="font-mono text-[11px] text-[#858177]">
-                {profile.stats_source === "synced" ? "Synced" : "Updated"} {formatDate(profile.updated_at)}
-              </p>
-              {isOwner && (
-                <OwnerEditLink
-                  href={profile.stats_source === "synced" ? "/settings/sync" : "/dashboard?section=stats"}
-                  label="Edit totals"
-                />
-              )}
-            </div>
+            <p className="font-mono text-[11px] text-[#858177]">
+              {isSynced ? "Synced" : "Updated"} {formatDate(profile.updated_at)}
+            </p>
           </div>
 
           {hasStatistics ? (
@@ -253,7 +239,9 @@ export function ProfileView({
                   </>
                 ) : (
                   <p className="mt-3 text-sm text-[#969287]">
-                    No added or removed line totals have been reported.
+                    {isSynced
+                      ? "No added or removed lines in the synced activity."
+                      : "No added or removed line totals have been reported."}
                   </p>
                 )}
               </div>
@@ -264,8 +252,9 @@ export function ProfileView({
                 No coding totals yet
               </p>
               <p className="mt-3 max-w-lg text-sm leading-6 text-[#aaa69a]">
-                This developer has established their identity here and can add
-                aggregate coding statistics whenever they are ready.
+                {isSynced
+                  ? "No coding totals in the synced activity yet."
+                  : "This developer has established their identity here and can add aggregate coding statistics whenever they are ready."}
               </p>
             </div>
           )}
@@ -276,28 +265,21 @@ export function ProfileView({
             className="border-t border-[#2b2a24] py-10 sm:py-12"
             aria-labelledby="languages-heading"
           >
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#969287]">
-                  Current distribution
-                </p>
-                <h2
-                  id="languages-heading"
-                  className="mt-2 [font-family:Georgia,'Times_New_Roman',serif] text-2xl text-[#edeae0]"
-                >
-                  Language activity
-                </h2>
-              </div>
-              {isOwner && (
-                <OwnerEditLink
-                  href={profile.stats_source === "synced" ? "/settings/sync" : "/dashboard?section=languages"}
-                  label="Edit languages"
-                />
-              )}
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#969287]">
+                Current distribution
+              </p>
+              <h2
+                id="languages-heading"
+                className="mt-2 [font-family:Georgia,'Times_New_Roman',serif] text-2xl text-[#edeae0]"
+              >
+                Language activity
+              </h2>
             </div>
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#969287]">
-              A self-reported percentage breakdown of this developer’s aggregate
-              activity.
+              {isSynced
+                ? "Automatically tracked by Stack Stats. Percentages reflect this developer’s synced activity."
+                : "A self-reported percentage breakdown of this developer’s aggregate activity."}
             </p>
 
             {profile.languages.length > 0 ? (
@@ -312,7 +294,9 @@ export function ProfileView({
             ) : (
               <div className="mt-7 border border-dashed border-[#34332c] px-6 py-8">
                 <p className="text-sm text-[#969287]">
-                  No language activity has been added yet.
+                  {isSynced
+                    ? "No language activity is published."
+                    : "No language activity has been added yet."}
                 </p>
               </div>
             )}
@@ -320,7 +304,11 @@ export function ProfileView({
         )}
 
         <footer className="flex flex-col gap-4 border-t border-[#2b2a24] py-7 text-[11px] text-[#858177] sm:flex-row sm:items-center sm:justify-between">
-          <p>Statistics are entered and maintained by the profile owner.</p>
+          <p>
+            {isSynced
+              ? "Statistics are automatically tracked by Stack Stats."
+              : "Statistics are entered and maintained by the profile owner."}
+          </p>
           <div className="flex items-center gap-3">
             <span>Made with Stack Stats</span>
             <Logo compact />
@@ -328,17 +316,5 @@ export function ProfileView({
         </footer>
       </div>
     </main>
-  );
-}
-
-function OwnerEditLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-[3px] border border-[#3b3931] px-2.5 font-mono text-[10px] text-[#aaa69a] transition hover:border-[#55a7ff] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
-    >
-      <Pencil className="size-3" />
-      {label}
-    </Link>
   );
 }

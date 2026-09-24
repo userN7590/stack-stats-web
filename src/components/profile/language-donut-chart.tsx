@@ -2,6 +2,9 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
+import { formatPercentage } from "@/lib/format";
+import { getLanguageDisplayName } from "@/lib/language-display";
+
 type LanguageDatum = {
   name: string;
   percentage: number;
@@ -22,7 +25,7 @@ export function LanguageDonutChart({ languages }: LanguageDonutChartProps) {
         language.percentage > 0,
     )
     .map((language) => ({
-      name: language.name.trim(),
+      name: getLanguageDisplayName(language.name),
       percentage: Math.min(100, language.percentage),
     }));
 
@@ -35,7 +38,7 @@ export function LanguageDonutChart({ languages }: LanguageDonutChartProps) {
   }
 
   const description = data
-    .map((language) => `${language.name} ${language.percentage}%`)
+    .map((language) => `${language.name} ${formatPercentage(language.percentage)}`)
     .join(", ");
 
   return (
@@ -63,7 +66,7 @@ export function LanguageDonutChart({ languages }: LanguageDonutChartProps) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value) => [`${Number(value).toLocaleString("en-US")}%`, "Activity"]}
+              formatter={(value) => [formatPercentage(Number(value)), "Activity"]}
               contentStyle={{
                 background: "#191914",
                 border: "1px solid #34332c",
@@ -92,7 +95,9 @@ export function LanguageDonutChart({ languages }: LanguageDonutChartProps) {
               />
               <span className="truncate">{language.name}</span>
             </span>
-            <span className="text-[#edeae0]">{language.percentage}%</span>
+            <span className="shrink-0 tabular-nums text-[#edeae0]">
+              {formatPercentage(language.percentage)}
+            </span>
           </li>
         ))}
       </ul>

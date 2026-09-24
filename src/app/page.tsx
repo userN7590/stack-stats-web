@@ -11,7 +11,8 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { Avatar } from "@/components/profile/avatar";
 import { AppNavbar } from "@/components/ui/app-navbar";
 import { Logo } from "@/components/ui/logo";
-import { formatCodingTime, formatNumber } from "@/lib/format";
+import { formatCodingTime, formatNumber, formatPercentage } from "@/lib/format";
+import { getLanguageDisplayName } from "@/lib/language-display";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, ProfileLanguage } from "@/lib/types";
 
@@ -234,7 +235,7 @@ function FilProfilePreview({
           <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 font-mono text-[9px] text-[#858177]">
             {visibleLanguages.map((language) => (
               <span key={language.id}>
-                {language.name} {formatNumber(language.percentage)}%
+                {getLanguageDisplayName(language.name)} {formatPercentage(language.percentage)}
               </span>
             ))}
           </div>

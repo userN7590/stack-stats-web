@@ -5,9 +5,12 @@ import {
   formatCodingTime,
   formatDate,
   formatNumber,
+  formatPercentage,
   getHostname,
   getInitials,
 } from "../src/lib/format";
+import { getLanguageDisplayName } from "../src/lib/language-display";
+import { SYNC_LANGUAGES } from "../src/lib/sync-contract";
 import { appearanceSchema, profileSchema } from "../src/lib/validation";
 
 const validProfileInput = {
@@ -172,6 +175,19 @@ describe("appearanceSchema", () => {
 
 describe("formatting utilities", () => {
   it.each([
+    [55.16842947293574, "55.2%"],
+    [44.83157052706426, "44.8%"],
+    [33.333333333333336, "33.3%"],
+    [99.99, "100%"],
+    [0, "0%"],
+    [0.1, "0.1%"],
+    [55, "55%"],
+    [100, "100%"],
+  ])("formats %s percent as %s", (value, expected) => {
+    expect(formatPercentage(value)).toBe(expected);
+  });
+
+  it.each([
     [0, "0m"],
     [37, "37m"],
     [60, "1h"],
@@ -205,5 +221,36 @@ describe("formatting utilities", () => {
   it("formats valid UTC dates and handles invalid dates", () => {
     expect(formatDate("2026-08-27T00:00:00.000Z")).toBe("Aug 27, 2026");
     expect(formatDate("invalid")).toBe("Unknown");
+  });
+});
+
+describe("language display names", () => {
+  it.each([
+    ["javascriptreact", "React (JavaScript)"],
+    ["typescriptreact", "React (TypeScript)"],
+    ["javascript", "JavaScript"],
+    ["  TypeScript  ", "TypeScript"],
+    ["cpp", "C++"],
+    ["csharp", "C#"],
+    ["fsharp", "F#"],
+    ["objective-cpp", "Objective-C++"],
+    ["shellscript", "Shell Script"],
+    ["jsonc", "JSON with Comments"],
+    ["plaintext", "Plain Text"],
+    ["graphql", "GraphQL"],
+    ["other", "Other"],
+    ["My Custom DSL", "My Custom DSL"],
+    ["vendor-language", "vendor-language"],
+    ["__proto__", "__proto__"],
+    ["constructor", "constructor"],
+    ["", ""],
+  ])("displays %j as %j", (name, expected) => {
+    expect(getLanguageDisplayName(name)).toBe(expected);
+  });
+
+  it("provides a display label for every accepted telemetry language ID", () => {
+    for (const id of SYNC_LANGUAGES) {
+      expect(getLanguageDisplayName(id), id).not.toBe(id);
+    }
   });
 });
