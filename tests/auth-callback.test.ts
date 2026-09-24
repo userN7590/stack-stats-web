@@ -17,6 +17,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("confirmation callback", () => {
+  it("keeps the code-free production probe private and preserves its continuation", async () => {
+    const response = await GET(new Request("https://stackstats.dev/auth/callback?next=" + encodeURIComponent(continuation)));
+    const location = new URL(response.headers.get("location")!);
+    expect(response.status).toBe(307);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(location.origin).toBe("https://stackstats.dev");
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("error")).toBe("confirmation");
+    expect(location.searchParams.get("next")).toBe(continuation);
+    expect(mocks.exchange).not.toHaveBeenCalled();
+  });
+
   it("returns to the complete extension request on the public origin behind a proxy", async () => {
     const url = new URL("http://localhost:3000/auth/callback");
     url.search = new URLSearchParams({ code: "confirmation-code", sb_flow_id: "flow", next: continuation }).toString();

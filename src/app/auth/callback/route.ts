@@ -4,6 +4,9 @@ import { appOrigin, privateHeaders } from "@/lib/extension-auth";
 
 import { createClient } from "@/lib/supabase/server";
 
+// Auth redirects must run per request, including callbacks without a code.
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
