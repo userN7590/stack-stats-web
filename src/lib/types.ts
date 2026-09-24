@@ -16,6 +16,8 @@ export type Profile = {
   coding_minutes: number;
   display_font: DisplayFont;
   background_style: BackgroundStyle;
+  /** Untrusted, versioned presentation config; absent on pre-migration profiles. */
+  profile_layout?: unknown;
   created_at: string;
   updated_at: string;
 };

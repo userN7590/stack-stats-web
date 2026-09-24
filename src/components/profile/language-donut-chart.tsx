@@ -12,11 +12,12 @@ type LanguageDatum = {
 
 type LanguageDonutChartProps = {
   languages: LanguageDatum[];
+  compact?: boolean;
 };
 
 const colors = ["#55a7ff", "#65c58f", "#d8aa54", "#a58bd4", "#77746b"];
 
-export function LanguageDonutChart({ languages }: LanguageDonutChartProps) {
+export function LanguageDonutChart({ languages, compact = false }: LanguageDonutChartProps) {
   const data = languages
     .filter(
       (language) =>
@@ -42,7 +43,7 @@ export function LanguageDonutChart({ languages }: LanguageDonutChartProps) {
     .join(", ");
 
   return (
-    <div className="grid items-center gap-7 sm:grid-cols-[190px_1fr]">
+    <div className={`grid items-center gap-7 ${compact ? "" : "sm:grid-cols-[190px_1fr]"}`}>
       <div
         className="mx-auto h-[190px] w-[190px]"
         role="img"

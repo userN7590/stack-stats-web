@@ -159,6 +159,12 @@ export default async function DashboardPage({
               aria-label="Profile settings"
               className="mb-6 flex flex-wrap gap-x-5 gap-y-3 border-y border-[#2b2a24] py-4 font-mono text-xs"
             >
+              <Link
+                href={`/u/${typedProfile.username}?customize=1`}
+                className="text-[#aaa69a] underline decoration-[#444239] underline-offset-4 transition hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]"
+              >
+                Profile layout
+              </Link>
               {profileSections.map((item) => (
                 <Link
                   key={item}

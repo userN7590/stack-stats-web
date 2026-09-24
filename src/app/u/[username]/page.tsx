@@ -23,6 +23,7 @@ export async function generateMetadata({
 
 export default async function PublicProfilePage({
   params,
+  searchParams,
 }: PageProps<"/u/[username]">) {
   const { username } = await params;
   const normalizedUsername = username.toLowerCase();
@@ -43,7 +44,7 @@ export default async function PublicProfilePage({
 
   const [
     { data: languages, error: languageError },
-    { data: claimsData },
+    { data: claimsData, error: claimsError },
   ] = await Promise.all([
     supabase
       .from("profile_languages")
@@ -58,6 +59,8 @@ export default async function PublicProfilePage({
   }
 
   const synced = await supabase.rpc("sync_public_profile", { p_username: normalizedUsername });
+  const isOwner = !claimsError && claimsData?.claims?.sub === profile.user_id;
+  const customize = isOwner && (await searchParams).customize === "1";
   // Fail closed on the new data source: never expose private rows. Manual
   // values remain available during a rolling deployment or service outage.
   return (
@@ -68,7 +71,8 @@ export default async function PublicProfilePage({
         background_style: profile.background_style ?? defaultBackgroundStyle,
         languages: (languages as ProfileLanguage[] | null) ?? [],
       }, synced.error ? null : synced.data)}
-      isOwner={claimsData?.claims?.sub === profile.user_id}
+      isOwner={isOwner}
+      customize={customize}
     />
   );
 }
