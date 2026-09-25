@@ -1,8 +1,17 @@
 -- Read-only post-migration assertions. Safe for the hosted SQL Editor.
 -- No credentials, user records, token hashes or telemetry are selected.
 begin read only;
+set local search_path = pg_catalog, public;
 do $$
-declare relation_name text; role_name text; item record;
+declare
+  relation_name text;
+  role_name text;
+  item record;
+  profile_policy record;
+  permissive_count integer;
+  owner_expressions text[] := array[
+    'selectauth.uidasuid=user_id', 'selectauth.uid=user_id', 'auth.uid=user_id'
+  ];
 begin
   assert exists (
     select 1 from pg_extension e join pg_namespace n on n.oid=e.extnamespace
@@ -56,9 +65,83 @@ begin
       and conname='profiles_profile_layout_check' and contype='c' and convalidated
   ), 'Missing validated profile layout constraint';
   assert (select relrowsecurity from pg_class where oid='public.profiles'::regclass), 'Profiles RLS must remain enabled';
-  assert not has_table_privilege('anon','public.profiles','INSERT,UPDATE,DELETE'), 'Anonymous profile writes must remain forbidden';
+  -- Hosted Supabase may grant DML through default privileges. GRANT SELECT in
+  -- our first migration does not revoke those pre-existing grants. Table ACLs
+  -- say which commands are reachable, not which rows RLS allows them to change.
+  -- Check the actual migration's policy contract, including inherited roles,
+  -- PUBLIC and FOR ALL policies. Policy names alone are not a security check.
+  foreach role_name in array array['anon', 'authenticated'] loop
+    assert (select not rolsuper and not rolbypassrls from pg_roles where rolname = role_name),
+      'Client role must not bypass RLS: ' || role_name;
+    assert not pg_has_role(role_name, (select relowner from pg_class where oid = 'public.profiles'::regclass), 'USAGE'),
+      'Client role must not own/inherit ownership of profiles: ' || role_name;
+    assert has_schema_privilege(role_name, 'public', 'USAGE'), 'Missing public schema access: ' || role_name;
+
+    for item in select * from (values
+      ('SELECT', 'r'), ('INSERT', 'a'), ('UPDATE', 'w'), ('DELETE', 'd')
+    ) as commands(privilege, command) loop
+      if role_name = 'authenticated' or item.command = 'r' then
+        -- Separate calls matter: a comma-separated privilege list means ANY,
+        -- not ALL, in has_table_privilege().
+        assert has_table_privilege(role_name, 'public.profiles', item.privilege),
+          'Missing profile ' || item.privilege || ' grant: ' || role_name;
+      end if;
+
+      permissive_count := 0;
+      for profile_policy in
+        select p.polname, p.polpermissive,
+          regexp_replace(lower(pg_get_expr(p.polqual, p.polrelid)), '[[:space:]()]', '', 'g') as using_expression,
+          regexp_replace(lower(pg_get_expr(coalesce(p.polwithcheck, p.polqual), p.polrelid)), '[[:space:]()]', '', 'g') as check_expression
+        from pg_policy p
+        where p.polrelid = 'public.profiles'::regclass
+          and p.polcmd::text in (item.command, '*')
+          and exists (
+            select 1 from unnest(p.polroles) as roles(role_oid)
+            where case when role_oid = 0 then true
+              else pg_has_role(role_name, role_oid, 'USAGE') end
+          )
+      loop
+        if profile_policy.polpermissive then
+          permissive_count := permissive_count + 1;
+        end if;
+        if role_name = 'anon' and item.command <> 'r' then
+          -- Without an applicable permissive write policy, RLS denies every
+          -- row regardless of table/column DML grants. Restrictive policies
+          -- cannot independently grant access.
+          assert not profile_policy.polpermissive,
+            'Anonymous profile write policy is forbidden: ' || profile_policy.polname;
+        elsif item.command = 'r' then
+          assert coalesce(profile_policy.using_expression = 'true', false),
+            'Public profile SELECT policy has changed: ' || profile_policy.polname;
+        else
+          -- Accept the original scalar-subquery auth.uid() and its direct
+          -- equivalent, ignoring deparser whitespace/parentheses only. Reject
+          -- unexpected expressions rather than guessing that they are safe.
+          if item.command in ('w', 'd') then
+            assert coalesce(profile_policy.using_expression = any(owner_expressions), false),
+              'Profile write USING must match auth.uid() to user_id: ' || profile_policy.polname;
+          end if;
+          if item.command in ('a', 'w') then
+            assert coalesce(profile_policy.check_expression = any(owner_expressions), false),
+              'Profile write WITH CHECK must match auth.uid() to user_id: ' || profile_policy.polname;
+          end if;
+        end if;
+      end loop;
+      if role_name = 'authenticated' or item.command = 'r' then
+        assert permissive_count > 0,
+          'Missing applicable profile ' || item.privilege || ' policy: ' || role_name;
+      end if;
+    end loop;
+  end loop;
+
   assert has_column_privilege('anon','public.profiles','profile_layout','SELECT'), 'Public profiles must read layouts';
   assert (select not prosecdef from pg_proc where oid='public.update_profile_layout(jsonb)'::regprocedure), 'Layout RPC must retain caller RLS';
+  assert not exists (
+    select 1 from pg_proc p,
+      lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as acl
+    where p.oid = 'public.update_profile_layout(jsonb)'::regprocedure
+      and acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+  ), 'Layout RPC must not grant EXECUTE to PUBLIC';
   assert exists (
     select 1 from pg_trigger where tgrelid='public.profiles'::regclass
       and tgname='profiles_set_updated_at' and not tgisinternal
@@ -66,4 +149,14 @@ begin
   ), 'Missing layout-aware profile timestamp trigger';
   raise notice 'Auth/sync/layout schema, RLS and grants passed. Verify migration history and run the browser/editor E2E separately.';
 end $$;
+
+-- Metadata only. These ACL booleans may be true on hosted Supabase even though
+-- the policies verified above deny anonymous INSERT/UPDATE/DELETE row access.
+select role_name,
+  has_table_privilege(role_name, 'public.profiles', 'SELECT') as table_select_grant,
+  has_table_privilege(role_name, 'public.profiles', 'INSERT') as table_insert_grant,
+  has_table_privilege(role_name, 'public.profiles', 'UPDATE') as table_update_grant,
+  has_table_privilege(role_name, 'public.profiles', 'DELETE') as table_delete_grant,
+  has_function_privilege(role_name, 'public.update_profile_layout(jsonb)', 'EXECUTE') as layout_rpc_execute
+from (values ('anon'), ('authenticated')) as roles(role_name);
 rollback;

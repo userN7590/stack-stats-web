@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout } from "node:timers/promises";
+import { testProductionVerifier } from "./test-production-verifier.mjs";
 
 const container = `stack-stats-test-${randomUUID()}`;
 const docker = (args, input) => execFileSync("docker", args, { input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
@@ -74,8 +75,10 @@ try {
       }
     }
   }
-  sql(readFileSync(new URL("../supabase/verify-production.sql", import.meta.url), "utf8"));
+  const verifier = readFileSync(new URL("../supabase/verify-production.sql", import.meta.url), "utf8");
+  sql(verifier);
   console.log("PASS production schema/permission assertions");
+  await testProductionVerifier(sql, verifier);
 } catch (error) {
   console.error(error.stderr?.toString() || error.message);
   process.exitCode = 1;
