@@ -48,6 +48,28 @@ export async function testProductionVerifier(executeSql, verifier) {
     { name: "missing owner RPC execution", setup: "revoke execute on function public.update_profile_layout(jsonb) from authenticated;", error: "Incorrect authenticated grant: update_profile_layout" },
     { name: "RPC bypasses caller RLS", setup: "alter function public.update_profile_layout(jsonb) security definer;", error: "Layout RPC must retain caller RLS" },
     {
+      name: "missing visualization v1 dependency",
+      setup: "drop function public.profile_layout_v1_is_valid(jsonb);",
+      error: "Missing function: profile_layout_v1_is_valid(jsonb)",
+    },
+    {
+      name: "renamed visualization v1 dependency",
+      setup: "alter function public.profile_layout_v1_is_valid(jsonb) rename to verifier_old_layout_helper;",
+      error: "Missing function: profile_layout_v1_is_valid(jsonb)",
+    },
+    {
+      name: "wrong helper argument type does not satisfy the contract",
+      setup: `drop function public.profile_layout_v1_is_valid(jsonb);
+        create function public.profile_layout_v1_is_valid(json) returns boolean
+          language sql as 'select true';`,
+      error: "Missing function: profile_layout_v1_is_valid(jsonb)",
+    },
+    {
+      name: "missing authenticated helper execution",
+      setup: "revoke execute on function public.profile_layout_v1_is_valid(jsonb) from authenticated;",
+      error: "Incorrect authenticated grant: profile_layout_v1_is_valid(jsonb)",
+    },
+    {
       name: "actual public reads, anonymous denial, and owner-scoped writes with hosted grants",
       setup: `
         grant insert, update, delete on public.profiles to anon;

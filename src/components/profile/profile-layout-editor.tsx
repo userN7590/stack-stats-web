@@ -7,13 +7,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { VisualizationEditor } from "@/components/profile/visualizations/visualization-editor";
+import { defaultVisualizationConfig } from "@/lib/visualization";
 import { ProfileSectionPicker } from "@/components/profile/profile-section-picker";
 import { sectionSurface, SortableProfileSection } from "@/components/profile/sortable-profile-section";
 import { ProfileModuleContent, ProfileModules } from "@/components/profile/profile-modules";
 import {
+  addVisualization,
+  getModuleKey,
+  getModuleLabel,
+  hasUnsupportedVisualizations,
+  removeVisualization,
+  setVisualizationConfig,
   getDefaultProfileLayout,
   isUnsupportedLayoutVersion,
-  moduleDefinitions,
   moveModule,
   moveModuleTo,
   moveStat,
@@ -23,7 +30,6 @@ import {
   setModuleVisibility,
   statIds,
   toggleStat,
-  type ModuleType,
   type ProfileLayout,
 } from "@/lib/profile-layout";
 import { getProfileMetrics } from "@/lib/profile-metrics";
@@ -37,7 +43,8 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
   const router = useRouter();
   const [saved, setSaved] = useState(() => normalizeProfileLayout(profile.profile_layout));
   const [draft, setDraft] = useState(saved);
-  const [activeType, setActiveType] = useState<ModuleType | null>(null);
+  const [activeType, setActiveType] = useState<string | null>(null);
+  const [newVisualization, setNewVisualization] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,11 +52,11 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
   const [announcement, setAnnouncement] = useState("");
   const addButton = useRef<HTMLButtonElement>(null);
   const statPicker = useRef<HTMLElement>(null);
-  const sections = useRef<Partial<Record<ModuleType, HTMLElement | null>>>({});
-  const unsupported = isUnsupportedLayoutVersion(profile.profile_layout);
+  const sections = useRef<Partial<Record<string, HTMLElement | null>>>({});
+  const unsupported = isUnsupportedLayoutVersion(profile.profile_layout) || hasUnsupportedVisualizations(profile.profile_layout);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const visible = draft.modules.filter((module) => module.visible);
-  const activeModule = visible.find((module) => module.type === activeType);
+  const activeModule = visible.find((module) => getModuleKey(module) === activeType);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -87,20 +94,34 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
     setAnnouncement(message);
   }
 
-  function reorder(type: ModuleType, direction: -1 | 1) {
+  function reorder(type: string, direction: -1 | 1) {
     const next = moveModule(draft, type, direction);
     const order = next.modules.filter((module) => module.visible);
-    update(next, `${moduleDefinitions[type].label} moved to position ${order.findIndex((module) => module.type === type) + 1} of ${order.length}.`);
+    update(next, `${labelFor(type)} moved to position ${order.findIndex((module) => getModuleKey(module) === type) + 1} of ${order.length}.`);
   }
 
   function finishDrag({ active, over }: DragEndEvent) {
     setActiveType(null);
     if (!over) return;
-    const source = visible.find((module) => module.type === active.id);
-    const target = visible.find((module) => module.type === over.id);
-    if (!source || !target || source.type === target.type) return;
-    const next = moveModuleTo(draft, source.type, target.type);
-    update(next, `${moduleDefinitions[source.type].label} moved to position ${visible.findIndex((module) => module.type === target.type) + 1} of ${visible.length}.`);
+    const source = visible.find((module) => getModuleKey(module) === active.id);
+    const target = visible.find((module) => getModuleKey(module) === over.id);
+    if (!source || !target || getModuleKey(source) === getModuleKey(target)) return;
+    const next = moveModuleTo(draft, getModuleKey(source), getModuleKey(target));
+    update(next, `${getModuleLabel(source)} moved to position ${visible.findIndex((module) => getModuleKey(module) === getModuleKey(target)) + 1} of ${visible.length}.`);
+  }
+
+  function labelFor(key: string) {
+    const section = draft.modules.find((module) => getModuleKey(module) === key);
+    return section ? getModuleLabel(section) : "Section";
+  }
+
+  function createVisualization() {
+    const id = `viz_${crypto.randomUUID()}`;
+    const config = defaultVisualizationConfig(profile.languages.length ? "language_share" : "line_changes");
+    update(addVisualization(draft, id, config), "Visualization added. Choose its data, style, and colors below.");
+    setNewVisualization(id);
+    setAdding(false);
+    requestAnimationFrame(() => sections.current[id]?.focus());
   }
 
   function closePicker() {
@@ -108,14 +129,14 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
     addButton.current?.focus();
   }
 
-  function hide(type: ModuleType) {
+  function hide(type: string) {
     if (visible.length <= 1) return;
-    update(setModuleVisibility(draft, type, false), `${moduleDefinitions[type].label} hidden. Restore it with Add section.`);
+    update(setModuleVisibility(draft, type, false), `${labelFor(type)} hidden. Restore it with Add section.`);
     addButton.current?.focus();
   }
 
-  function restore(type: ModuleType) {
-    update(setModuleVisibility(draft, type, true), `${moduleDefinitions[type].label} added.`);
+  function restore(type: string) {
+    update(setModuleVisibility(draft, type, true), `${labelFor(type)} added.`);
     setAdding(false);
     requestAnimationFrame(() => sections.current[type]?.focus());
   }
@@ -181,40 +202,47 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
 
       {unsupported && <p role="alert" className="mt-5 border border-[#3b3931] p-4 text-sm text-[#d8aa54]">This layout was saved with a newer version of Stack Stats. Editing is unavailable here, so your saved layout stays intact.</p>}
 
-      {adding && <ProfileSectionPicker modules={draft.modules} disabled={saving} onChoose={restore} onClose={closePicker} />}
+      {adding && <ProfileSectionPicker modules={draft.modules} disabled={saving} onChoose={restore} onAddVisualization={createVisualization} onClose={closePicker} />}
 
       {preview || unsupported ? <ProfileModules profile={profile} layout={draft} /> : (
         <DndContext
           id="profile-sections"
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={({ active }) => { setAdding(false); setActiveType(visible.find((module) => module.type === active.id)?.type ?? null); }}
+          onDragStart={({ active }) => { setAdding(false); setActiveType(String(active.id)); }}
           onDragCancel={() => setActiveType(null)}
           onDragEnd={finishDrag}
           accessibility={{
             screenReaderInstructions: { draggable: "To reorder this section, press Space, use the arrow keys to move, then press Space again to drop. Press Escape to cancel. You can also use the Shift section up and down buttons." },
             announcements: {
-              onDragStart: ({ active }) => `Picked up ${moduleDefinitions[active.id as ModuleType].label}.`,
-              onDragOver: ({ active, over }) => over ? `${moduleDefinitions[active.id as ModuleType].label}, position ${visible.findIndex((module) => module.type === over.id) + 1} of ${visible.length}.` : "Outside the sections. Release to cancel.",
-              onDragEnd: ({ active, over }) => over ? `${moduleDefinitions[active.id as ModuleType].label} dropped at position ${visible.findIndex((module) => module.type === over.id) + 1} of ${visible.length}.` : "Reordering cancelled.",
+              onDragStart: ({ active }) => `Picked up ${labelFor(String(active.id))}.`,
+              onDragOver: ({ active, over }) => over ? `${labelFor(String(active.id))}, position ${visible.findIndex((module) => getModuleKey(module) === over.id) + 1} of ${visible.length}.` : "Outside the sections. Release to cancel.",
+              onDragEnd: ({ active, over }) => over ? `${labelFor(String(active.id))} dropped at position ${visible.findIndex((module) => getModuleKey(module) === over.id) + 1} of ${visible.length}.` : "Reordering cancelled.",
               onDragCancel: () => "Reordering cancelled. Your layout is unchanged.",
             },
           }}
         >
-          <SortableContext items={visible.map((module) => module.type)} strategy={rectSortingStrategy}>
+          <SortableContext items={visible.map(getModuleKey)} strategy={rectSortingStrategy}>
             <div className="mt-6 grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
               {visible.map((module, index) => (
                 <SortableProfileSection
-                  key={module.type}
+                  key={getModuleKey(module)}
                   module={module}
                   index={index}
                   count={visible.length}
                   disabled={saving}
-                  sectionRef={(element) => { sections.current[module.type] = element; }}
-                  onShift={(direction) => reorder(module.type, direction)}
-                  onHide={() => hide(module.type)}
-                  onSize={(size) => update(setModuleSize(draft, module.type, size), `${moduleDefinitions[module.type].label} set to ${size} width.`)}
+                  sectionRef={(element) => { sections.current[getModuleKey(module)] = element; }}
+                  onShift={(direction) => reorder(getModuleKey(module), direction)}
+                  onHide={() => hide(getModuleKey(module))}
+                  onSize={(size) => update(setModuleSize(draft, getModuleKey(module), size), `${getModuleLabel(module)} set to ${size} width.`)}
                 >
+                  {module.type === "visualization" && <VisualizationEditor
+                    profile={profile} config={module.config} disabled={saving}
+                    initialOpen={module.id === newVisualization}
+                    canRemove={visible.length > 1 || !module.visible}
+                    onChange={(config) => update(setVisualizationConfig(draft, module.id, config), "Visualization updated. Save to publish your changes.")}
+                    onRemove={() => { update(removeVisualization(draft, module.id), "Visualization removed."); addButton.current?.focus(); }}
+                  />}
                   {module.type === "stats" && (
                     <fieldset disabled={saving} className="mb-4 min-w-0">
                       <legend className="sr-only">Headline stat selection</legend>
@@ -247,7 +275,7 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
           <DragOverlay dropAnimation={null}>
             {activeModule && (
               <div aria-hidden="true" inert className={`${sectionSurface} pointer-events-none border-[#55a7ff] shadow-[0_16px_60px_#0009]`}>
-                <div className="mb-4 flex min-h-11 items-center gap-3 border-b border-[#3b3931] pb-2 font-mono text-xs text-[#55a7ff]"><GripVertical className="size-5" />{moduleDefinitions[activeModule.type].label}</div>
+                <div className="mb-4 flex min-h-11 items-center gap-3 border-b border-[#3b3931] pb-2 font-mono text-xs text-[#55a7ff]"><GripVertical className="size-5" />{getModuleLabel(activeModule)}</div>
                 <ProfileModuleContent profile={profile} module={activeModule} />
               </div>
             )}

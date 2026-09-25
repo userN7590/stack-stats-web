@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout } from "node:timers/promises";
 import { testProductionVerifier } from "./test-production-verifier.mjs";
+import { testProfileVisualizationUpgrade } from "./test-profile-visualization-upgrade.mjs";
 
 const container = `stack-stats-test-${randomUUID()}`;
 const docker = (args, input) => execFileSync("docker", args, { input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
@@ -35,7 +36,14 @@ try {
   for (const directory of ["migrations", "tests"]) {
     const location = new URL(`../supabase/${directory}/`, import.meta.url);
     for (const filename of readdirSync(location).filter(name => name.endsWith(".sql")).sort()) {
-      sql(readFileSync(new URL(filename, location), "utf8"));
+      const migration = readFileSync(new URL(filename, location), "utf8");
+      if (filename === "20260925000000_profile_visualizations.sql") {
+        await testProfileVisualizationUpgrade(sql, migration,
+          readFileSync(new URL("../supabase/verify-profile-visualizations-preflight.sql", import.meta.url), "utf8"),
+          readFileSync(new URL("../supabase/verify-production.sql", import.meta.url), "utf8"));
+      } else {
+        sql(migration);
+      }
       console.log(`PASS ${directory}/${filename}`);
       if (filename === "20260827000100_add_profile_appearance.sql") {
         sql(`

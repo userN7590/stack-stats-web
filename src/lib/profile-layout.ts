@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { defaultVisualizationConfig, normalizeVisualizationConfig, rendererDefinitions, visualizationConfigSchema, type VisualizationConfig } from "@/lib/visualization";
+
 export const statIds = [
   "lines_added",
   "lines_removed",
@@ -10,13 +12,14 @@ export const statIds = [
 ] as const;
 
 export type StatId = (typeof statIds)[number];
-export type ModuleType = "stats" | "code_changes" | "languages" | "links";
+export type ModuleType = "stats" | "code_changes" | "languages" | "links" | "visualization";
 export type ModuleSize = "full" | "half";
 
 export const moduleDefinitions: Record<
   ModuleType,
   { label: string; description: string; sizes: readonly ModuleSize[] }
 > = {
+  visualization: { label: "Visualization", description: "Show your activity in a style that feels like you.", sizes: ["full", "half"] },
   stats: {
     label: "Headline stats",
     description: "Choose the coding totals you want to highlight.",
@@ -49,6 +52,13 @@ const statSelectionSchema = z
 
 const moduleSchema = z.discriminatedUnion("type", [
   z.strictObject({
+    type: z.literal("visualization"),
+    id: z.string().regex(/^viz_[a-z0-9-]{1,64}$/),
+    visible: z.boolean(),
+    size: z.enum(["full", "half"]),
+    config: visualizationConfigSchema,
+  }),
+  z.strictObject({
     type: z.literal("stats"),
     visible: z.boolean(),
     size: z.literal("full"),
@@ -74,15 +84,19 @@ const moduleSchema = z.discriminatedUnion("type", [
 /** Saving is strict; older or damaged stored layouts are handled by the reader below. */
 export const profileLayoutSchema = z
   .strictObject({
-    version: z.literal(1),
-    modules: z.array(moduleSchema).length(4),
+    version: z.union([z.literal(1), z.literal(2)]),
+    modules: z.array(moduleSchema).min(4).max(10),
   })
   .superRefine((layout, context) => {
-    if (new Set(layout.modules.map((module) => module.type)).size !== 4) {
+    const core = layout.modules.filter((module) => module.type !== "visualization");
+    const visualizations = layout.modules.filter((module) => module.type === "visualization");
+    if (core.length !== 4 || new Set(core.map((module) => module.type)).size !== 4 ||
+      new Set(visualizations.map((module) => module.id)).size !== visualizations.length ||
+      (layout.version === 1 && visualizations.length > 0)) {
       context.addIssue({
         code: "custom",
         path: ["modules"],
-        message: "Include each section exactly once.",
+        message: "Include each core section once and give each visualization a unique identity.",
       });
     }
     if (!layout.modules.some((module) => module.visible)) {
@@ -127,7 +141,7 @@ function isStatId(value: unknown): value is StatId {
 
 /** A future layout can be displayed with defaults, but must not be overwritten by this editor. */
 export function isUnsupportedLayoutVersion(raw: unknown): boolean {
-  return isRecord(raw) && typeof raw.version === "number" && raw.version !== 1;
+  return isRecord(raw) && typeof raw.version === "number" && raw.version !== 1 && raw.version !== 2;
 }
 
 /**
@@ -135,19 +149,19 @@ export function isUnsupportedLayoutVersion(raw: unknown): boolean {
  * choices, omit unknown sections, and leave newly introduced sections hidden.
  */
 export function normalizeProfileLayout(raw: unknown): ProfileLayout {
-  if (!isRecord(raw) || raw.version !== 1 || !Array.isArray(raw.modules)) {
+  if (!isRecord(raw) || (raw.version !== 1 && raw.version !== 2) || !Array.isArray(raw.modules)) {
     return getDefaultProfileLayout();
   }
 
   const modules: ProfileModule[] = [];
-  const seen = new Set<ModuleType>();
+  const seen = new Set<string>();
 
   for (const row of raw.modules) {
     if (
       !isRecord(row) ||
       !isModuleType(row.type) ||
       typeof row.visible !== "boolean" ||
-      seen.has(row.type)
+      seen.has(row.type === "visualization" ? String(row.id) : row.type)
     ) {
       continue;
     }
@@ -157,7 +171,12 @@ export function normalizeProfileLayout(raw: unknown): ProfileLayout {
         ? "half"
         : "full";
 
-    if (row.type === "stats") {
+    if (row.type === "visualization") {
+      if (raw.version !== 2 || typeof row.id !== "string" || !/^viz_[a-z0-9-]{1,64}$/.test(row.id)) continue;
+      const config = normalizeVisualizationConfig(row.config);
+      if (!config || modules.filter((section) => section.type === "visualization").length >= 6) continue;
+      modules.push({ type: "visualization", id: row.id, visible: row.visible, size, config });
+    } else if (row.type === "stats") {
       const stats = Array.isArray(row.stats)
         ? [...new Set(row.stats.filter(isStatId))]
         : [];
@@ -170,10 +189,10 @@ export function normalizeProfileLayout(raw: unknown): ProfileLayout {
     } else {
       modules.push({ type: row.type, visible: row.visible, size });
     }
-    seen.add(row.type);
+    seen.add(row.type === "visualization" ? String(row.id) : row.type);
   }
 
-  if (!modules.some((module) => module.visible)) {
+  if (!modules.some((module) => module.visible) && !hasUnsupportedVisualizations(raw)) {
     return getDefaultProfileLayout();
   }
 
@@ -183,16 +202,16 @@ export function normalizeProfileLayout(raw: unknown): ProfileLayout {
     }
   }
 
-  return { version: 1, modules };
+  return { version: raw.version, modules };
 }
 
 /** Move by one visible section, so a hidden section never consumes a click. */
 export function moveModule(
   layout: ProfileLayout,
-  type: ModuleType,
+  type: string,
   direction: -1 | 1,
 ): ProfileLayout {
-  const index = layout.modules.findIndex((module) => module.type === type);
+  const index = layout.modules.findIndex((module) => getModuleKey(module) === type);
   if (index < 0 || !layout.modules[index].visible) return layout;
 
   let target = index + direction;
@@ -210,12 +229,12 @@ export function moveModule(
 /** Drag to a visible position, keeping hidden sections in their saved slots. */
 export function moveModuleTo(
   layout: ProfileLayout,
-  type: ModuleType,
-  targetType: ModuleType,
+  type: string,
+  targetType: string,
 ): ProfileLayout {
   const visible = layout.modules.filter((module) => module.visible);
-  const from = visible.findIndex((module) => module.type === type);
-  const to = visible.findIndex((module) => module.type === targetType);
+  const from = visible.findIndex((module) => getModuleKey(module) === type);
+  const to = visible.findIndex((module) => getModuleKey(module) === targetType);
   if (from < 0 || to < 0 || from === to) return layout;
   const [moved] = visible.splice(from, 1);
   visible.splice(to, 0, moved);
@@ -228,30 +247,31 @@ export function moveModuleTo(
 
 export function setModuleVisibility(
   layout: ProfileLayout,
-  type: ModuleType,
+  type: string,
   visible: boolean,
 ): ProfileLayout {
-  if (!visible && !layout.modules.some((module) => module.type !== type && module.visible)) {
+  if (!visible && !layout.modules.some((module) => getModuleKey(module) !== type && module.visible)) {
     return layout;
   }
   return {
     ...layout,
     modules: layout.modules.map((module) =>
-      module.type === type ? { ...module, visible } : module,
+      getModuleKey(module) === type ? { ...module, visible } : module,
     ),
   };
 }
 
 export function setModuleSize(
   layout: ProfileLayout,
-  type: ModuleType,
+  type: string,
   size: ModuleSize,
 ): ProfileLayout {
-  if (!moduleDefinitions[type].sizes.includes(size)) return layout;
+  const section = layout.modules.find((module) => getModuleKey(module) === type);
+  if (!section || !moduleDefinitions[section.type].sizes.includes(size)) return layout;
   return {
     ...layout,
     modules: layout.modules.map((module) =>
-      module.type === type && module.type !== "stats" ? { ...module, size } : module,
+      getModuleKey(module) === type && module.type !== "stats" ? { ...module, size } : module,
     ),
   };
 }
@@ -290,4 +310,38 @@ export function moveStat(
       return { ...module, stats };
     }),
   };
+}
+
+
+export function getModuleKey(section: ProfileModule): string {
+  return section.type === "visualization" ? section.id : section.type;
+}
+
+export function getModuleLabel(section: ProfileModule): string {
+  return section.type === "visualization" ? rendererDefinitions[section.config.renderer].label : moduleDefinitions[section.type].label;
+}
+
+/** Unknown semantics are omitted publicly; the editor locks saves to preserve them. */
+export function hasUnsupportedVisualizations(raw: unknown): boolean {
+  if (!isRecord(raw) || raw.version !== 2 || !Array.isArray(raw.modules)) return false;
+  return raw.modules.some((row) => isRecord(row) && (
+    !isModuleType(row.type) || (row.type === "visualization" && !normalizeVisualizationConfig(row.config))
+  ));
+}
+
+export function addVisualization(layout: ProfileLayout, id: string, config = defaultVisualizationConfig()): ProfileLayout {
+  if (layout.modules.filter((module) => module.type === "visualization").length >= 6 ||
+    layout.modules.some((module) => getModuleKey(module) === id) || !/^viz_[a-z0-9-]{1,64}$/.test(id) ||
+    !visualizationConfigSchema.safeParse(config).success) return layout;
+  return { version: 2, modules: [...layout.modules, { type: "visualization", id, visible: true, size: "full", config }] };
+}
+
+export function setVisualizationConfig(layout: ProfileLayout, id: string, config: VisualizationConfig): ProfileLayout {
+  if (!visualizationConfigSchema.safeParse(config).success) return layout;
+  return { ...layout, modules: layout.modules.map((module) => module.type === "visualization" && module.id === id ? { ...module, config } : module) };
+}
+
+export function removeVisualization(layout: ProfileLayout, id: string): ProfileLayout {
+  if (!layout.modules.some((module) => getModuleKey(module) !== id && module.visible)) return layout;
+  return { ...layout, modules: layout.modules.filter((module) => module.type !== "visualization" || module.id !== id) };
 }

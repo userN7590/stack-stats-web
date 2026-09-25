@@ -128,7 +128,8 @@ describe("stored profile layout normalization", () => {
   });
 
   it("identifies unsupported numeric versions so the editor can preserve future configurations", () => {
-    expect(isUnsupportedLayoutVersion({ version: 2 })).toBe(true);
+    expect(isUnsupportedLayoutVersion({ version: 3 })).toBe(true);
+    expect(isUnsupportedLayoutVersion({ version: 2 })).toBe(false);
     expect(isUnsupportedLayoutVersion({ version: 0 })).toBe(true);
     expect(isUnsupportedLayoutVersion({ version: 1 })).toBe(false);
     expect(isUnsupportedLayoutVersion(null)).toBe(false);
@@ -139,7 +140,7 @@ describe("stored profile layout normalization", () => {
 
 describe("strict profile layout save validation", () => {
   it.each([
-    ["future version", (layout: ProfileLayout) => ({ ...layout, version: 2 })],
+    ["future version", (layout: ProfileLayout) => ({ ...layout, version: 3 })],
     ["extra top-level field", (layout: ProfileLayout) => ({ ...layout, theme: "custom" })],
     ["missing section", (layout: ProfileLayout) => ({ ...layout, modules: layout.modules.slice(1) })],
     ["duplicate section", (layout: ProfileLayout) => ({ ...layout, modules: [layout.modules[0], ...layout.modules.slice(0, 3)] })],

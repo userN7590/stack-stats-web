@@ -1,9 +1,10 @@
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { VisualizationSection } from "@/components/profile/visualizations/visualization-section";
 import { LanguageDonutChart } from "@/components/profile/language-donut-chart";
 import { formatDate, formatNumber, getHostname } from "@/lib/format";
-import { moduleDefinitions, type ModuleType, type ProfileLayout, type ProfileModule } from "@/lib/profile-layout";
+import { getModuleKey, getModuleLabel, type ModuleType, type ProfileLayout, type ProfileModule } from "@/lib/profile-layout";
 import { getProfileMetrics } from "@/lib/profile-metrics";
 import type { PublicProfile } from "@/lib/types";
 
@@ -17,6 +18,7 @@ export function hasModuleContent(type: ModuleType, profile: PublicProfile) {
 
 // New presentations plug in here; data adapters remain outside the renderers.
 const renderers: Record<ModuleType, (props: ModuleProps) => ReactNode> = {
+  visualization: ({ profile, module }) => module.type === "visualization" ? <VisualizationSection profile={profile} config={module.config} /> : null,
   stats: HeadlineStats,
   code_changes: CodeChanges,
   languages: Languages,
@@ -45,9 +47,9 @@ export function ProfileModules({ profile, layout, isOwner = false }: {
     <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
       {visibleModules.map((module) => (
         <section
-          key={module.type}
-          data-profile-section={module.type}
-          aria-label={moduleDefinitions[module.type].label}
+          key={getModuleKey(module)}
+          data-profile-section={getModuleKey(module)}
+          aria-label={getModuleLabel(module)}
           className={`min-w-0 border-b border-[#2b2a24] py-8 sm:py-10 ${module.size === "full" ? "sm:col-span-2" : ""}`}
         >
           <ProfileModuleContent profile={profile} module={module} />

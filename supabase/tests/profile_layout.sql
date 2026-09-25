@@ -102,7 +102,7 @@ begin
 
   foreach invalid in array array[
     'null'::jsonb, '[]'::jsonb, '{}'::jsonb,
-    layout || '{"version":2}', layout || '{"version":"1"}',
+    layout || '{"version":3}', layout || '{"version":"1"}',
     layout || '{"user_id":"22222222-2222-4222-8222-222222222222"}',
     layout - 'version', layout || '{"modules":null}', layout #- '{modules,3}',
     layout #- '{modules,0,visible}', layout #- '{modules,0,size}', layout #- '{modules,1,stats}',

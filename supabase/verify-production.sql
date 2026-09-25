@@ -9,6 +9,8 @@ declare
   item record;
   profile_policy record;
   permissive_count integer;
+  layout_v1 jsonb := '{"version":1,"modules":[{"type":"links","visible":true,"size":"full"},{"type":"stats","visible":true,"size":"full","stats":["coding_minutes"]},{"type":"code_changes","visible":false,"size":"half"},{"type":"languages","visible":false,"size":"half"}]}';
+  layout_v2 jsonb;
   owner_expressions text[] := array[
     'selectauth.uidasuid=user_id', 'selectauth.uid=user_id', 'auth.uid=user_id'
   ];
@@ -46,6 +48,7 @@ begin
     ('sync_validate_day(jsonb)',false,false),
     ('update_profile_layout(jsonb)',false,true),
     ('profile_layout_is_valid(jsonb)',false,true),
+    ('profile_layout_v1_is_valid(jsonb)',false,true),
     ('set_profile_updated_at()',false,false)
   ) as checks(signature,anon_allowed,authenticated_allowed) loop
     assert to_regprocedure('public.' || item.signature) is not null, 'Missing function: ' || item.signature;
@@ -147,7 +150,19 @@ begin
       and tgname='profiles_set_updated_at' and not tgisinternal
       and tgfoid='public.set_profile_updated_at()'::regprocedure
   ), 'Missing layout-aware profile timestamp trigger';
-  raise notice 'Auth/sync/layout schema, RLS and grants passed. Verify migration history and run the browser/editor E2E separately.';
+  -- Pure validation of synthetic configuration only; no profile data is read.
+  assert public.profile_layout_is_valid(null), 'Default layout sentinel must remain supported';
+  assert public.profile_layout_is_valid(layout_v1), 'Existing v1 layouts must remain valid';
+  assert public.profile_layout_v1_is_valid(layout_v1), 'Legacy layout helper must preserve v1';
+  layout_v2 := jsonb_set(jsonb_set(layout_v1, '{version}', '2'), '{modules}', layout_v1 -> 'modules' ||
+    '[{"type":"visualization","id":"viz_verify","visible":true,"size":"half","config":{"version":1,"dataset":"language_share","renderer":"polar_area","appearance":{"palette":"neon"}}}]'::jsonb);
+  assert public.profile_layout_is_valid(layout_v2), 'Visualization v2 configuration must be accepted';
+  assert not public.profile_layout_v1_is_valid(layout_v2), 'Legacy helper must reject future layouts';
+  assert not public.profile_layout_is_valid(jsonb_set(layout_v2, '{modules,4,config,renderer}', '"waterfall"')),
+    'Incompatible visualization dataset and renderer must be rejected';
+  assert not public.profile_layout_is_valid(jsonb_set(layout_v2, '{version}', '3')),
+    'Unknown layout versions must be rejected on save';
+  raise notice 'Auth/sync/layout/visualization schema, RLS and grants passed. Verify migration history and run the browser/editor E2E separately.';
 end $$;
 
 -- Metadata only. These ACL booleans may be true on hosted Supabase even though

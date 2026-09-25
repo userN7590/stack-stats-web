@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Check, ChevronDown, ChevronUp, EyeOff, GripVertical, MoreHorizontal } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { moduleDefinitions, type ModuleSize, type ProfileModule } from "@/lib/profile-layout";
+import { getModuleKey, getModuleLabel, moduleDefinitions, type ModuleSize, type ProfileModule } from "@/lib/profile-layout";
 
 export const sectionIconButton = "inline-flex size-11 shrink-0 items-center justify-center rounded-[3px] text-[#aaa69a] transition hover:bg-[#24231d] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] disabled:cursor-not-allowed disabled:opacity-35 aria-disabled:cursor-not-allowed aria-disabled:opacity-35";
 export const sectionSurface = "min-w-0 rounded-[4px] border bg-[#11110d] p-3 sm:p-5";
@@ -21,12 +21,12 @@ export function SortableProfileSection({ module, index, count, disabled, section
   onSize: (size: ModuleSize) => void;
   children: ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: module.type, disabled });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: getModuleKey(module), disabled });
   const [options, setOptions] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const optionsId = useId();
-  const label = moduleDefinitions[module.type].label;
+  const label = getModuleLabel(module);
 
   useEffect(() => {
     if (!options) return;
@@ -48,7 +48,7 @@ export function SortableProfileSection({ module, index, count, disabled, section
       ref={(element) => { setNodeRef(element); sectionRef(element); }}
       tabIndex={-1}
       aria-label={`${label} section`}
-      data-profile-section={module.type}
+      data-profile-section={getModuleKey(module)}
       data-dragging={isDragging || undefined}
       style={{ transform: CSS.Translate.toString(transform), transition, zIndex: options ? 10 : undefined }}
       className={`${sectionSurface} relative border-[#3b3931] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] motion-reduce:!transition-none ${isDragging ? "border-dashed border-[#55a7ff] opacity-30" : ""} ${module.size === "full" ? "sm:col-span-2" : ""}`}
