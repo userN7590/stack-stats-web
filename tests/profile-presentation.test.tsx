@@ -254,8 +254,13 @@ describe("modular profile presentation", () => {
     expect(html).toContain("Save layout");
     expect(html).toContain("Cancel");
     expect(html).toContain("Preview");
-    expect(html).toContain('aria-label="Move Languages down"');
-    expect(html).toContain('aria-label="Hide Languages"');
+    expect(html).toContain('aria-label="Shift Languages section down"');
+    expect(html).toContain('aria-label="Drag Languages section to reorder"');
+    expect(html).toContain("touch-none");
+    expect(html).toContain("size-11");
+    expect(html).not.toContain('aria-label="Hide Languages section"');
+    expect(html).not.toContain('aria-label="Set half width"');
+    expect(html).toContain('aria-label="Languages section options"');
     expect(html).toContain('aria-label="Move Coding time later"');
     expect(html).toContain("Choose stats · 2 of 6");
     expect(html).toContain("Sync settings");
@@ -274,8 +279,8 @@ describe("modular profile presentation", () => {
     expect(html).toContain('role="alert"');
     expect(html).toMatch(/<button\b[^>]*\bdisabled=""[^>]*>Save layout<\/button>/);
     expect(html).toMatch(/<button\b[^>]*\bdisabled=""[^>]*>.*?Add section<\/button>/);
-    expect(html).not.toContain('aria-label="Hide Languages"');
-    expect(html).not.toContain('aria-label="Move Languages down"');
+    expect(html).not.toContain('aria-label="Languages section options"');
+    expect(html).not.toContain('aria-label="Shift Languages section down"');
     expect(renderedSections(html)).toEqual(["links", "stats", "code_changes", "languages"]);
     expect(future).toEqual(before);
   });
@@ -283,7 +288,7 @@ describe("modular profile presentation", () => {
   it("does not reveal unpublished languages or replace them with manual data in the editor", () => {
     const profile = withSyncedProfile({ ...manual, profile_layout: customized }, { ...published, languages: [] });
     const html = renderToStaticMarkup(<ProfileView profile={profile} isOwner customize />);
-    expect(html).toContain('aria-label="Hide Languages"');
+    expect(html).toContain('aria-label="Languages section options"');
     expect(html).toContain("No language activity is published.");
     expect(html).toContain("Manage what you publish in Sync settings.");
     expect(html).not.toContain("Custom Manual Language");

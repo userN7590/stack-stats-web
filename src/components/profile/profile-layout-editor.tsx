@@ -1,16 +1,21 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, RotateCcw } from "lucide-react";
+import { closestCenter, DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { ArrowDown, ArrowUp, Eye, GripVertical, Plus, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ProfileSectionPicker } from "@/components/profile/profile-section-picker";
+import { sectionSurface, SortableProfileSection } from "@/components/profile/sortable-profile-section";
 import { ProfileModuleContent, ProfileModules } from "@/components/profile/profile-modules";
 import {
   getDefaultProfileLayout,
   isUnsupportedLayoutVersion,
   moduleDefinitions,
   moveModule,
+  moveModuleTo,
   moveStat,
   normalizeProfileLayout,
   profileLayoutSchema,
@@ -32,6 +37,7 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
   const router = useRouter();
   const [saved, setSaved] = useState(() => normalizeProfileLayout(profile.profile_layout));
   const [draft, setDraft] = useState(saved);
+  const [activeType, setActiveType] = useState<ModuleType | null>(null);
   const [preview, setPreview] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -43,7 +49,11 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
   const unsupported = isUnsupportedLayoutVersion(profile.profile_layout);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const visible = draft.modules.filter((module) => module.visible);
-  const hidden = draft.modules.filter((module) => !module.visible);
+  const activeModule = visible.find((module) => module.type === activeType);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const metrics = getProfileMetrics(profile);
   const profileHref = `/u/${profile.username}`;
 
@@ -81,6 +91,21 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
     const next = moveModule(draft, type, direction);
     const order = next.modules.filter((module) => module.visible);
     update(next, `${moduleDefinitions[type].label} moved to position ${order.findIndex((module) => module.type === type) + 1} of ${order.length}.`);
+  }
+
+  function finishDrag({ active, over }: DragEndEvent) {
+    setActiveType(null);
+    if (!over) return;
+    const source = visible.find((module) => module.type === active.id);
+    const target = visible.find((module) => module.type === over.id);
+    if (!source || !target || source.type === target.type) return;
+    const next = moveModuleTo(draft, source.type, target.type);
+    update(next, `${moduleDefinitions[source.type].label} moved to position ${visible.findIndex((module) => module.type === target.type) + 1} of ${visible.length}.`);
+  }
+
+  function closePicker() {
+    setAdding(false);
+    addButton.current?.focus();
   }
 
   function hide(type: ModuleType) {
@@ -125,11 +150,11 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
 
   return (
     <div className="py-6" aria-label="Customize profile">
-      <div className="sticky top-0 z-20 -mx-2 rounded-[4px] border border-[#3b3931] bg-[#171712]/95 p-4 backdrop-blur sm:-mx-4">
+      <div className="sm:sticky top-0 z-20 -mx-2 rounded-[4px] border border-[#3b3931] bg-[#171712]/95 p-4 backdrop-blur sm:-mx-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-mono text-sm text-[#edeae0]">Make this profile yours</h2>
-            <p className="mt-1 text-xs text-[#969287]">{dirty ? "Unsaved changes" : "Arrange the sections below. Changes go live when you save."}</p>
+            <p className="mt-1 text-xs text-[#969287]">{dirty ? "Unsaved changes" : "Drag the grips to arrange your profile. Save when it feels right."}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={buttonClass} disabled={saving} onClick={() => router.replace(profileHref, { scroll: false })}>Cancel</button>
@@ -156,66 +181,78 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
 
       {unsupported && <p role="alert" className="mt-5 border border-[#3b3931] p-4 text-sm text-[#d8aa54]">This layout was saved with a newer version of Stack Stats. Editing is unavailable here, so your saved layout stays intact.</p>}
 
-      {adding && (
-        <div id="available-profile-sections" className="mt-5 rounded-[4px] border border-[#3b3931] bg-[#171712] p-4">
-          <h3 className="font-mono text-sm text-[#edeae0]">Add a section</h3>
-          {hidden.length === 0 ? <p className="mt-2 text-sm text-[#969287]">All available sections are already on your profile.</p> : (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {hidden.map((module) => <button key={module.type} type="button" disabled={saving} className={`${buttonClass} flex-col items-start p-4 text-left`} onClick={() => restore(module.type)}><span>Add {moduleDefinitions[module.type].label}</span><span className="font-sans text-xs leading-5 text-[#969287]">{moduleDefinitions[module.type].description}</span></button>)}
-            </div>
-          )}
-        </div>
-      )}
+      {adding && <ProfileSectionPicker modules={draft.modules} disabled={saving} onChoose={restore} onClose={closePicker} />}
 
       {preview || unsupported ? <ProfileModules profile={profile} layout={draft} /> : (
-        <div className="mt-6 grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
-          {visible.map((module, index) => (
-            <section
-              key={module.type}
-              ref={(element) => { sections.current[module.type] = element; }}
-              tabIndex={-1}
-              aria-label={`${moduleDefinitions[module.type].label} section`}
-              data-profile-section={module.type}
-              className={`min-w-0 rounded-[4px] border border-[#3b3931] bg-[#11110d]/80 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] sm:p-5 ${module.size === "full" ? "sm:col-span-2" : ""}`}
-            >
-              <fieldset disabled={saving} className="mb-6 min-w-0 border-b border-[#2b2a24] pb-4">
-                <legend className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#55a7ff]">{index + 1} / {moduleDefinitions[module.type].label}</legend>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className={buttonClass} aria-label={`Move ${moduleDefinitions[module.type].label} up`} aria-disabled={index === 0} onClick={() => { if (index > 0) reorder(module.type, -1); }}><ArrowUp className={iconClass} /><span>Up</span></button>
-                  <button type="button" className={buttonClass} aria-label={`Move ${moduleDefinitions[module.type].label} down`} aria-disabled={index === visible.length - 1} onClick={() => { if (index < visible.length - 1) reorder(module.type, 1); }}><ArrowDown className={iconClass} /><span>Down</span></button>
-                  <button type="button" className={buttonClass} aria-label={`Hide ${moduleDefinitions[module.type].label}`} disabled={visible.length === 1} title={visible.length === 1 ? "Keep at least one section" : undefined} onClick={() => hide(module.type)}><EyeOff className={iconClass} />Hide</button>
-                </div>
-                {moduleDefinitions[module.type].sizes.length > 1 && (
-                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={`${moduleDefinitions[module.type].label} width`}>
-                    {moduleDefinitions[module.type].sizes.map((size) => <button key={size} type="button" className={`${buttonClass} aria-pressed:border-[#55a7ff] aria-pressed:text-[#55a7ff]`} aria-pressed={module.size === size} onClick={() => update(setModuleSize(draft, module.type, size), `${moduleDefinitions[module.type].label} set to ${size === "full" ? "full" : "half"} width.`)}>{size === "full" ? "Full width" : "Half width"}</button>)}
-                  </div>
-                )}
-                {module.type === "stats" && (
-                  <details className="mt-4">
-                    <summary ref={statPicker} className="cursor-pointer rounded-[3px] py-2 font-mono text-xs text-[#c8c4b9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]">Choose stats · {module.stats.length} of {statIds.length}</summary>
-                    <p className="mt-2 text-xs text-[#969287]">Choose one to six stats. Move them into the order you want.</p>
-                    <ol className="mt-3 divide-y divide-[#2b2a24]">
-                      {module.stats.map((id, statIndex) => (
-                        <li key={id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                          <span className="font-mono text-xs text-[#c8c4b9]">{metrics[id].label}</span>
-                          <div className="flex gap-1">
-                            <button type="button" className={buttonClass} aria-label={`Move ${metrics[id].label} earlier`} aria-disabled={statIndex === 0} onClick={() => { if (statIndex > 0) update(moveStat(draft, id, -1), `${metrics[id].label} moved earlier.`); }}><ArrowUp className={iconClass} /></button>
-                            <button type="button" className={buttonClass} aria-label={`Move ${metrics[id].label} later`} aria-disabled={statIndex === module.stats.length - 1} onClick={() => { if (statIndex < module.stats.length - 1) update(moveStat(draft, id, 1), `${metrics[id].label} moved later.`); }}><ArrowDown className={iconClass} /></button>
-                            <button type="button" className={buttonClass} aria-label={`Remove ${metrics[id].label}`} disabled={module.stats.length === 1} onClick={() => { update(toggleStat(draft, id), `${metrics[id].label} removed from headline stats.`); statPicker.current?.focus(); }}>Remove</button>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {statIds.filter((id) => !module.stats.includes(id)).map((id) => <button key={id} type="button" className={buttonClass} onClick={() => update(toggleStat(draft, id), `${metrics[id].label} added to headline stats.`)}><Plus className={iconClass} />Add {metrics[id].label}</button>)}
-                    </div>
-                  </details>
-                )}
-              </fieldset>
-              <ProfileModuleContent profile={profile} module={module} />
-            </section>
-          ))}
-        </div>
+        <DndContext
+          id="profile-sections"
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={({ active }) => { setAdding(false); setActiveType(visible.find((module) => module.type === active.id)?.type ?? null); }}
+          onDragCancel={() => setActiveType(null)}
+          onDragEnd={finishDrag}
+          accessibility={{
+            screenReaderInstructions: { draggable: "To reorder this section, press Space, use the arrow keys to move, then press Space again to drop. Press Escape to cancel. You can also use the Shift section up and down buttons." },
+            announcements: {
+              onDragStart: ({ active }) => `Picked up ${moduleDefinitions[active.id as ModuleType].label}.`,
+              onDragOver: ({ active, over }) => over ? `${moduleDefinitions[active.id as ModuleType].label}, position ${visible.findIndex((module) => module.type === over.id) + 1} of ${visible.length}.` : "Outside the sections. Release to cancel.",
+              onDragEnd: ({ active, over }) => over ? `${moduleDefinitions[active.id as ModuleType].label} dropped at position ${visible.findIndex((module) => module.type === over.id) + 1} of ${visible.length}.` : "Reordering cancelled.",
+              onDragCancel: () => "Reordering cancelled. Your layout is unchanged.",
+            },
+          }}
+        >
+          <SortableContext items={visible.map((module) => module.type)} strategy={rectSortingStrategy}>
+            <div className="mt-6 grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
+              {visible.map((module, index) => (
+                <SortableProfileSection
+                  key={module.type}
+                  module={module}
+                  index={index}
+                  count={visible.length}
+                  disabled={saving}
+                  sectionRef={(element) => { sections.current[module.type] = element; }}
+                  onShift={(direction) => reorder(module.type, direction)}
+                  onHide={() => hide(module.type)}
+                  onSize={(size) => update(setModuleSize(draft, module.type, size), `${moduleDefinitions[module.type].label} set to ${size} width.`)}
+                >
+                  {module.type === "stats" && (
+                    <fieldset disabled={saving} className="mb-4 min-w-0">
+                      <legend className="sr-only">Headline stat selection</legend>
+                      <details>
+                        <summary ref={statPicker} className="cursor-pointer rounded-[3px] py-2 font-mono text-xs text-[#c8c4b9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]">Choose stats · {module.stats.length} of {statIds.length}</summary>
+                        <p className="mt-2 text-xs text-[#969287]">Choose one to six stats. Move them into the order you want.</p>
+                        <ol className="mt-3 divide-y divide-[#2b2a24]">
+                          {module.stats.map((id, statIndex) => (
+                            <li key={id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                              <span className="font-mono text-xs text-[#c8c4b9]">{metrics[id].label}</span>
+                              <div className="flex gap-1">
+                                <button type="button" className={buttonClass} aria-label={`Move ${metrics[id].label} earlier`} aria-disabled={statIndex === 0} onClick={() => { if (statIndex > 0) update(moveStat(draft, id, -1), `${metrics[id].label} moved earlier.`); }}><ArrowUp className={iconClass} /></button>
+                                <button type="button" className={buttonClass} aria-label={`Move ${metrics[id].label} later`} aria-disabled={statIndex === module.stats.length - 1} onClick={() => { if (statIndex < module.stats.length - 1) update(moveStat(draft, id, 1), `${metrics[id].label} moved later.`); }}><ArrowDown className={iconClass} /></button>
+                                <button type="button" className={buttonClass} aria-label={`Remove ${metrics[id].label}`} disabled={module.stats.length === 1} onClick={() => { update(toggleStat(draft, id), `${metrics[id].label} removed from headline stats.`); statPicker.current?.focus(); }}>Remove</button>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {statIds.filter((id) => !module.stats.includes(id)).map((id) => <button key={id} type="button" className={buttonClass} onClick={() => update(toggleStat(draft, id), `${metrics[id].label} added to headline stats.`)}><Plus className={iconClass} />Add {metrics[id].label}</button>)}
+                        </div>
+                      </details>
+                    </fieldset>
+                  )}
+                  <ProfileModuleContent profile={profile} module={module} />
+                </SortableProfileSection>
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activeModule && (
+              <div aria-hidden="true" inert className={`${sectionSurface} pointer-events-none border-[#55a7ff] shadow-[0_16px_60px_#0009]`}>
+                <div className="mb-4 flex min-h-11 items-center gap-3 border-b border-[#3b3931] pb-2 font-mono text-xs text-[#55a7ff]"><GripVertical className="size-5" />{moduleDefinitions[activeModule.type].label}</div>
+                <ProfileModuleContent profile={profile} module={activeModule} />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );

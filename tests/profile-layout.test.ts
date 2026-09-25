@@ -5,6 +5,7 @@ import {
   isUnsupportedLayoutVersion,
   moduleDefinitions,
   moveModule,
+  moveModuleTo,
   moveStat,
   normalizeProfileLayout,
   profileLayoutSchema,
@@ -237,6 +238,7 @@ describe("profile layout editing", () => {
 
     const edits = [
       moveModule(layout, "links", 1),
+      moveModuleTo(layout, "links", "languages"),
       setModuleVisibility(layout, "links", false),
       setModuleSize(layout, "languages", "half"),
       toggleStat(layout, "lines_added"),
@@ -247,5 +249,48 @@ describe("profile layout editing", () => {
       expect(profileLayoutSchema.safeParse(edited).success).toBe(true);
     }
     expect(JSON.stringify(layout)).toBe(before);
+  });
+});
+
+
+describe("drag section ordering", () => {
+  const types = ["links", "stats", "code_changes", "languages"] as const;
+
+  it.each(types.flatMap((from) => types.map((to) => ({ from, to }))))("moves $from to $to without swapping intervening sections", ({ from, to }) => {
+    const layout = setModuleSize(getDefaultProfileLayout(), "languages", "half");
+    const before = structuredClone(layout);
+    const expected = [...types];
+    expected.splice(types.indexOf(from), 1);
+    expected.splice(types.indexOf(to), 0, from);
+    const next = moveModuleTo(layout, from, to);
+    expect(next.modules.map((module) => module.type)).toEqual(expected);
+    for (const section of next.modules) expect(section).toEqual(before.modules.find((row) => row.type === section.type));
+    expect(normalizeProfileLayout(JSON.parse(JSON.stringify(next)))).toEqual(next);
+    expect(profileLayoutSchema.safeParse(next).success).toBe(true);
+    expect(layout).toEqual(before);
+  });
+
+  it("keeps hidden slots and their settings intact during a drag and restore", () => {
+    const layout = setModuleVisibility(setModuleSize(getDefaultProfileLayout(), "code_changes", "half"), "code_changes", false);
+    const next = moveModuleTo(layout, "languages", "links");
+    expect(next.modules.map((module) => module.type)).toEqual(["languages", "links", "code_changes", "stats"]);
+    expect(next.modules[2]).toEqual(layout.modules[2]);
+    const restored = setModuleVisibility(next, "code_changes", true);
+    expect(restored.modules[2]).toEqual({ type: "code_changes", visible: true, size: "half" });
+    expect(setModuleVisibility(restored, "code_changes", true)).toEqual(restored);
+    expect(profileLayoutSchema.safeParse(restored).success).toBe(true);
+  });
+
+  it("ignores hidden drag sources and targets", () => {
+    const layout = setModuleVisibility(getDefaultProfileLayout(), "stats", false);
+    expect(moveModuleTo(layout, "stats", "links")).toBe(layout);
+    expect(moveModuleTo(layout, "links", "stats")).toBe(layout);
+    expect(moveModule(layout, "stats", 1)).toBe(layout);
+  });
+
+  it("matches the compact arrow fallback for adjacent visible sections", () => {
+    const layout = setModuleVisibility(getDefaultProfileLayout(), "stats", false);
+    expect(moveModuleTo(layout, "links", "code_changes")).toEqual(moveModule(layout, "links", 1));
+    expect(moveModuleTo(layout, "languages", "code_changes")).toEqual(moveModule(layout, "languages", -1));
   });
 });

@@ -193,7 +193,7 @@ export function moveModule(
   direction: -1 | 1,
 ): ProfileLayout {
   const index = layout.modules.findIndex((module) => module.type === type);
-  if (index < 0) return layout;
+  if (index < 0 || !layout.modules[index].visible) return layout;
 
   let target = index + direction;
   while (target >= 0 && target < layout.modules.length) {
@@ -205,6 +205,25 @@ export function moveModule(
     target += direction;
   }
   return layout;
+}
+
+/** Drag to a visible position, keeping hidden sections in their saved slots. */
+export function moveModuleTo(
+  layout: ProfileLayout,
+  type: ModuleType,
+  targetType: ModuleType,
+): ProfileLayout {
+  const visible = layout.modules.filter((module) => module.visible);
+  const from = visible.findIndex((module) => module.type === type);
+  const to = visible.findIndex((module) => module.type === targetType);
+  if (from < 0 || to < 0 || from === to) return layout;
+  const [moved] = visible.splice(from, 1);
+  visible.splice(to, 0, moved);
+  let index = 0;
+  return {
+    ...layout,
+    modules: layout.modules.map((module) => module.visible ? visible[index++] : module),
+  };
 }
 
 export function setModuleVisibility(
