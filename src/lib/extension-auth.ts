@@ -3,10 +3,11 @@ import { z } from "zod";
 export const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const linkSchema = z.object({
   scope: z.literal("stats:write").optional(),
+  statsSchemaVersion: z.literal(2).optional(),
   challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   state: z.string().regex(/^[a-f0-9]{64}$/),
   redirectUri: z.string().max(2048),
-}).strict();
+}).strict().refine(value => value.statsSchemaVersion === undefined || value.scope === "stats:write");
 export const exchangeSchema = z.object({ code: tokenSchema, verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/), redirectUri: z.string().max(2048) }).strict();
 export const refreshSchema = z.object({ refreshToken: tokenSchema, nextRefreshToken: tokenSchema.optional() }).strict();
 

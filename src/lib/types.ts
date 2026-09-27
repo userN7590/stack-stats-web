@@ -32,5 +32,7 @@ export type ProfileLanguage = {
 
 export type PublicProfile = Profile & {
   stats_source?: "synced";
+  published_metrics?: import("@/lib/sync-datasets").PublishedMetrics;
+  project_count_incomplete?: boolean;
   languages: ProfileLanguage[];
 };

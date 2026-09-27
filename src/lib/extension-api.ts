@@ -36,7 +36,7 @@ export async function handleExtensionRequest(request: Request, action: "authoriz
     if (action === "authorize") {
       link = linkSchema.parse(await body(request));
       if (!validRedirect(link.redirectUri)) return authJson({ error: "invalid_redirect" }, 400);
-      name = link.scope === "stats:write" ? "extension_authorize_stats" : "extension_authorize"; args = { p_challenge: link.challenge, p_redirect_uri: link.redirectUri };
+      name = link.statsSchemaVersion === 2 ? "extension_authorize_stats_v2" : link.scope === "stats:write" ? "extension_authorize_stats" : "extension_authorize"; args = { p_challenge: link.challenge, p_redirect_uri: link.redirectUri };
     } else if (action === "exchange") {
       const data = exchangeSchema.parse(await body(request));
       if (!validRedirect(data.redirectUri)) return authJson({ error: "invalid_redirect" }, 400);

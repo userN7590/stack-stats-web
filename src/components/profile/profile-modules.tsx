@@ -7,6 +7,7 @@ import { formatDate, formatNumber, getHostname } from "@/lib/format";
 import { getModuleKey, getModuleLabel, type ModuleType, type ProfileLayout, type ProfileModule } from "@/lib/profile-layout";
 import { getProfileMetrics } from "@/lib/profile-metrics";
 import type { PublicProfile } from "@/lib/types";
+import { publishedLinesAvailable } from "@/lib/synced-profile";
 
 type ModuleProps = { profile: PublicProfile; module: ProfileModule };
 
@@ -79,7 +80,7 @@ function HeadlineStats({ profile, module }: ModuleProps) {
           Development totals
         </SectionTitle>
         <p className="font-mono text-[11px] text-[#858177]">
-          {synced ? "Synced" : "Updated"} {formatDate(profile.updated_at)}
+          {profile.published_metrics ? "Selected synced metrics · Last 30 days" : <>{synced ? "Synced" : "Updated"} {formatDate(profile.updated_at)}</>}
         </p>
       </div>
       <div className={`mt-7 grid border-l border-t border-[#2b2a24] ${module.stats.length === 1 ? "grid-cols-1" : module.stats.length === 2 || module.stats.length === 4 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
@@ -95,6 +96,7 @@ function HeadlineStats({ profile, module }: ModuleProps) {
 }
 
 function CodeChanges({ profile }: ModuleProps) {
+  if (!publishedLinesAvailable(profile)) return <><SectionTitle>Code changes</SectionTitle><p className="mt-4 text-sm text-[#969287]">Both line totals must be published to display this comparison.</p></>;
   const total = profile.lines_added + profile.lines_removed;
   return (
     <>

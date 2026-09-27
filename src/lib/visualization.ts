@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getLanguageDisplayName } from "@/lib/language-display";
 import type { PublicProfile } from "@/lib/types";
+import { publishedLinesAvailable } from "@/lib/synced-profile";
 
 export const datasetIds = ["language_share", "line_changes"] as const;
 export const rendererIds = ["bars", "dots", "radial_bars", "polar_area", "donut", "waterfall"] as const;
@@ -115,7 +116,7 @@ export function getVisualizationDataset(profile: PublicProfile, id: DatasetId): 
   const synced = profile.stats_source === "synced";
   const sourceLabel = synced ? "Automatically tracked by Stack Stats" : "Self-reported profile data";
   if (id === "line_changes") {
-    const valid = [profile.lines_added, profile.lines_removed].every((value) => Number.isFinite(value) && value >= 0);
+    const valid = publishedLinesAvailable(profile) && [profile.lines_added, profile.lines_removed].every((value) => Number.isFinite(value) && value >= 0);
     return {
       id, kind: "change", label: "Code changes", unit: "lines", sourceLabel,
       rows: valid && profile.lines_added + profile.lines_removed > 0 ? [

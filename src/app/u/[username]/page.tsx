@@ -1,4 +1,4 @@
-import { withSyncedProfile } from "@/lib/synced-profile";
+import { withSyncedProfile, withPublishedMetrics } from "@/lib/synced-profile";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -58,19 +58,21 @@ export default async function PublicProfilePage({
     throw new Error(languageError.message);
   }
 
-  const synced = await supabase.rpc("sync_public_profile", { p_username: normalizedUsername });
+  const rich = await supabase.rpc("sync_public_profile_v2", { p_username: normalizedUsername });
+  const synced = !rich.error && rich.data !== null ? null : await supabase.rpc("sync_public_profile", { p_username: normalizedUsername });
   const isOwner = !claimsError && claimsData?.claims?.sub === profile.user_id;
   const customize = isOwner && (await searchParams).customize === "1";
   // Fail closed on the new data source: never expose private rows. Manual
   // values remain available during a rolling deployment or service outage.
+  const baseProfile = {
+    ...(profile as Profile),
+    display_font: profile.display_font ?? defaultDisplayFont,
+    background_style: profile.background_style ?? defaultBackgroundStyle,
+    languages: (languages as ProfileLanguage[] | null) ?? [],
+  };
   return (
     <ProfileView
-      profile={withSyncedProfile({
-        ...(profile as Profile),
-        display_font: profile.display_font ?? defaultDisplayFont,
-        background_style: profile.background_style ?? defaultBackgroundStyle,
-        languages: (languages as ProfileLanguage[] | null) ?? [],
-      }, synced.error ? null : synced.data)}
+      profile={synced ? withSyncedProfile(baseProfile, synced.error ? null : synced.data) : withPublishedMetrics(baseProfile, rich.data)}
       isOwner={isOwner}
       customize={customize}
     />

@@ -7,10 +7,11 @@ export function ExtensionConsent({ request, username, cancelUrl }: { request: Li
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [callback, setCallback] = useState<string>();
+  const [richConsent, setRichConsent] = useState(false);
   async function approve() {
     setBusy(true); setMessage("");
     try {
-      const response = await fetch("/api/extension/authorize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request), signal: AbortSignal.timeout(15_000) });
+      const response = await fetch("/api/extension/authorize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ challenge: request.challenge, state: request.state, redirectUri: request.redirectUri, scope: request.scope, ...(request.scope && richConsent ? { statsSchemaVersion: 2 } : {}) }), signal: AbortSignal.timeout(15_000) });
       if (!response.ok) throw new Error("approval_failed");
       const data = await response.json();
       setCallback(data.callbackUrl);
@@ -22,8 +23,9 @@ export function ExtensionConsent({ request, username, cancelUrl }: { request: Li
   return <div className="space-y-5 text-sm leading-7">
     <p>{request.scope ? "Enable private summary uploads" : "Connect VS Code"} as <strong>@{username}</strong>?</p>
     <p>Stack Stats tracks locally by default. Connecting an account enables optional profile synchronization.</p>
-    {request.scope ? <p className="text-[#969287]">Approve stats:write: upload daily coding time, edits, line changes, file and session counts, language totals, and opaque project totals. Initial history is limited to the last 90 local calendar days; enabled installations continue uploading subsequent activity. No source, file names, prompts, raw events, or project names are uploaded. Uploads are private. Publishing totals and languages requires a separate choice in Sync Privacy.</p> : <p className="text-[#969287]">This connection shares only your account identity. It does not authorize coding history uploads.</p>}
+    {request.scope ? <p className="text-[#969287]">Approve stats:write: upload daily coding time, edits, line changes, daily file and session participation counts, language totals, and opaque project totals. Initial history is limited to the last 90 local calendar days; enabled installations continue uploading subsequent activity. No source, file names, prompts, raw events, or project names are uploaded. Uploads are private. Publishing totals and languages requires a separate choice in Sync Privacy.</p> : <p className="text-[#969287]">This connection shares only your account identity. It does not authorize coding history uploads.</p>}
     <p className="text-[#969287]">Only approve if you just requested this connection or Profile Sync in your editor.</p>
+    {request.scope && <label className="flex items-start gap-3"><input type="checkbox" className="mt-2" checked={richConsent} disabled={busy || Boolean(callback)} onChange={event => setRichConsent(event.target.checked)} /><span>Also allow richer private aggregates: session starts, completed-session active durations and histograms, observation coverage dates, and bounded project activity. Optional UTC hourly activity can reveal work patterns and uploads only when separately enabled in the editor (off by default). This does not publish these datasets. Disabling uploads retains cloud records; cloud export and deletion are separate account actions.</span></label>}
     <button className="rounded bg-[#55a7ff] px-5 py-3 font-semibold text-[#11110d] disabled:opacity-50" disabled={busy || Boolean(callback)} onClick={approve}>{busy ? "Connecting…" : request.scope ? "Approve private summary uploads" : "Connect VS Code"}</button>
     <a className="ml-5 underline" href={cancelUrl}>Cancel</a>
     {message && <p role="status">{message}</p>}

@@ -115,26 +115,42 @@ describe("public profile customization entry", () => {
 });
 
 describe("profile source and layout boundary", () => {
+  it("uses selective publication without fetching broader legacy totals", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { schemaVersion: "2", metrics: [{ id: "activity.active_ms", definitionVersion: 1, unit: "milliseconds", quality: "partial", dateBasis: "collector-local", value: 90000 }] }, error: null });
+    const result = await page("1");
+    expect(result.props.profile).toMatchObject({ stats_source: "synced", coding_minutes: 1, lines_added: 0, languages: [] });
+    expect(result.props.profile.published_metrics?.metrics).toHaveLength(1);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.rpc).toHaveBeenCalledWith("sync_public_profile_v2", { p_username: "developer" });
+  });
+  it("keeps an empty selective publication empty, regardless of visible layout modules", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: { schemaVersion: "2", metrics: [] }, error: null });
+    const result = await page();
+    expect(result.props.profile.published_metrics?.metrics).toEqual([]);
+    expect(result.props.profile.lines_added).toBe(0);
+    expect(result.props.profile.profile_layout).toEqual(savedLayout);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
   it.each([
     { data: null, error: null },
     { data: null, error: { message: "RPC unavailable" } },
     { data: published, error: { message: "RPC failed" } },
     { data: { ...published, recordCount: 0 }, error: null },
   ])("preserves saved manual data and layout on publication fallback (%j)", async (response) => {
-    mocks.rpc.mockResolvedValueOnce(response);
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: null }).mockResolvedValueOnce(response);
     const result = await page("1");
     expect(result.props.profile.lines_added).toBe(123);
     expect(result.props.profile.languages).toEqual(manualLanguages);
     expect(result.props.profile.profile_layout).toEqual(savedLayout);
     expect(result.props.profile.stats_source).toBeUndefined();
-    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
   });
 
   it.each(["owner", "another-owner", null])(
     "uses only published sync data for the %s view and never restores unpublished manual languages",
     async (viewer) => {
       mocks.claims.mockResolvedValueOnce({ data: { claims: viewer ? { sub: viewer } : null }, error: null });
-      mocks.rpc.mockResolvedValueOnce({ data: published, error: null });
+      mocks.rpc.mockResolvedValueOnce({ data: null, error: null }).mockResolvedValueOnce({ data: published, error: null });
       const result = await page("1");
       expect(result.props.profile).toMatchObject({
         stats_source: "synced",
@@ -142,7 +158,7 @@ describe("profile source and layout boundary", () => {
         languages: [],
         profile_layout: savedLayout,
       });
-      expect(mocks.rpc).toHaveBeenCalledTimes(1);
+      expect(mocks.rpc).toHaveBeenCalledTimes(2);
       expect(mocks.rpc).toHaveBeenCalledWith("sync_public_profile", { p_username: "developer" });
       expect(mocks.from.mock.calls.map(([table]) => table)).toEqual(["profiles", "profile_languages"]);
       expect(manualProfile.lines_added).toBe(123);

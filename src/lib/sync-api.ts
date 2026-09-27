@@ -3,21 +3,32 @@ import { anonymousClient, body } from "@/lib/extension-api";
 import { appOrigin, authJson } from "@/lib/extension-auth";
 import { parseSyncDay, syncInstallationPattern, validSyncDate, SYNC_MAX_BYTES } from "@/lib/sync-contract";
 import { createClient } from "@/lib/supabase/server";
+import { parseSyncDayV2 } from "@/lib/stack-stats-protocol/sync-v2";
 
 export async function putSyncDay(request: Request, installationId: string, date: string): Promise<Response> {
+  return putDay(request, installationId, date, parseSyncDay);
+}
+export async function putSyncDayV2(request: Request, installationId: string, date: string): Promise<Response> {
+  return putDay(request, installationId, date, parseSyncDayV2);
+}
+async function putDay(request: Request, installationId: string, date: string, parse: typeof parseSyncDay | typeof parseSyncDayV2): Promise<Response> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) return authJson({ error: "unauthorized" }, 401);
   if (!syncInstallationPattern.test(installationId) || !validSyncDate(date)) return authJson({ error: "invalid_request" }, 400);
   let payload;
-  try { payload = parseSyncDay(await body(request, SYNC_MAX_BYTES)); }
+  try { payload = parse(await body(request, SYNC_MAX_BYTES)); }
   catch { return authJson({ error: "invalid_request" }, 400); }
   if (payload.date !== date) return authJson({ error: "invalid_request" }, 400);
   try {
     const { data, error } = await anonymousClient().rpc("sync_put_day", { p_access_token: authorization.slice(7), p_installation_id: installationId, p_date: date, p_payload: payload });
     if (error) return authJson({ error: error.code === "28000" ? "unauthorized" : error.code === "42501" ? "insufficient_scope" : "temporarily_unavailable" }, error.code === "28000" ? 401 : error.code === "42501" ? 403 : 503);
     if (data?.error) {
-      const statuses: Record<string, number> = { stale_revision: 409, revision_conflict: 409, invalid_request: 400, installation_limit: 422, rate_limited: 429 };
-      return authJson({ error: data.error, ...(data.revision ? { revision: data.revision } : {}) }, statuses[data.error] ?? 503);
+      const statuses: Record<string, number> = { stale_revision: 409, revision_conflict: 409, version_downgrade: 409, invalid_request: 400, installation_limit: 422, rate_limited: 429 };
+      return authJson({ error: statuses[data.error] ? data.error : "temporarily_unavailable", ...(Number.isSafeInteger(data.revision) ? { revision: data.revision } : {}) }, statuses[data.error] ?? 503);
+    }
+    if (payload.schemaVersion === "2") {
+      if (data?.schemaVersion !== "2" || data.installationId !== installationId || data.date !== date || data.revision !== payload.revision || typeof data.unchanged !== "boolean") return authJson({ error: "temporarily_unavailable" }, 503);
+      return authJson({ schemaVersion: "2", installationId, date, revision: payload.revision, unchanged: data.unchanged });
     }
     return authJson(data);
   } catch { return authJson({ error: "temporarily_unavailable" }, 503); }

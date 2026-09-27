@@ -49,12 +49,55 @@ begin
     ('update_profile_layout(jsonb)',false,true),
     ('profile_layout_is_valid(jsonb)',false,true),
     ('profile_layout_v1_is_valid(jsonb)',false,true),
-    ('set_profile_updated_at()',false,false)
+    ('set_profile_updated_at()',false,false),
+    ('extension_authorize_stats_v2(text,text)',false,true),
+    ('sync_capabilities(text)',true,true),
+    ('sync_validate_day_v2(jsonb)',false,false),
+    ('sync_v2_object(jsonb,text[])',false,false),
+    ('sync_v2_count(jsonb,numeric)',false,false),
+    ('sync_v2_date(jsonb)',false,false),
+    ('sync_json_numbers_safe(jsonb)',false,false),
+    ('sync_checked_result(jsonb)',false,false),
+    ('sync_aggregate_v2(uuid,date,date)',false,false),
+    ('sync_period_from(text,date)',false,false),
+    ('sync_datasets_v2(uuid,date,date,text)',false,false),
+    ('sync_public_metric_ids()',false,false),
+    ('sync_publication_valid(jsonb,boolean)',false,false),
+    ('sync_private_summary_v2(text,date)',false,true),
+    ('sync_private_datasets_v2(text,date,text)',false,true),
+    ('sync_get_privacy_v2()',false,true),
+    ('sync_set_privacy_v2(boolean,jsonb,boolean)',false,true),
+    ('sync_public_profile_v2(text,text,date)',true,true),
+    ('sync_export_v2(date,uuid)',false,true),
+    ('sync_erase_cloud_data()',false,true)
   ) as checks(signature,anon_allowed,authenticated_allowed) loop
     assert to_regprocedure('public.' || item.signature) is not null, 'Missing function: ' || item.signature;
     assert has_function_privilege('anon','public.' || item.signature,'EXECUTE')=item.anon_allowed, 'Incorrect anon grant: ' || item.signature;
     assert has_function_privilege('authenticated','public.' || item.signature,'EXECUTE')=item.authenticated_allowed, 'Incorrect authenticated grant: ' || item.signature;
   end loop;
+  foreach relation_name in array array['extension_auth_codes','extension_connections'] loop
+    assert exists(select 1 from information_schema.columns where table_schema='public' and table_name=relation_name and column_name='stats_schema_version' and is_nullable='NO' and column_default='1'), 'Missing v1-default consent version: ' || relation_name;
+    assert exists(select 1 from information_schema.columns where table_schema='public' and table_name=relation_name and column_name='stats_consent_at'), 'Missing richer consent timestamp';
+    assert exists(select 1 from pg_constraint where conrelid=('public.'||relation_name)::regclass and conname=relation_name||'_rich_consent' and convalidated), 'Missing validated richer consent constraint';
+  end loop;
+  assert exists(select 1 from information_schema.columns where table_schema='public' and table_name='sync_privacy' and column_name='publication_version' and column_default='1' and is_nullable='NO'), 'Missing v1-default publication version';
+  assert exists(select 1 from information_schema.columns where table_schema='public' and table_name='sync_privacy' and column_name='publish_schedule' and column_default='false' and is_nullable='NO'), 'Schedule publication must default off';
+  assert exists(select 1 from information_schema.columns where table_schema='public' and table_name='sync_privacy' and column_name='published_metrics' and column_default='''[]''::jsonb' and is_nullable='NO'), 'Selected metrics must default empty';
+  assert exists(select 1 from pg_constraint where conrelid='public.sync_privacy'::regclass and conname='sync_privacy_metric_selection' and convalidated), 'Missing publication allowlist constraint';
+  for item in select p.* from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.proname in ('extension_authorize_stats_v2','sync_capabilities','sync_aggregate_v2','sync_datasets_v2','sync_private_summary_v2','sync_private_datasets_v2','sync_get_privacy_v2','sync_set_privacy_v2','sync_public_profile_v2','sync_export_v2','sync_erase_cloud_data') loop
+    assert item.prosecdef and item.proconfig=array['search_path=""']::text[], 'Unsafe v2 function execution context: '||item.proname;
+    assert not exists(select 1 from aclexplode(coalesce(item.proacl,acldefault('f',item.proowner))) acl where acl.grantee=0 and acl.privilege_type='EXECUTE'), 'PUBLIC v2 function execution is forbidden';
+  end loop;
+  assert public.sync_publication_valid('["activity.active_ms"]',false), 'Safe metric selection rejected';
+  assert not public.sync_publication_valid('["schedule.daily"]',false), 'Schedule consent bypass';
+  assert not public.sync_publication_valid('["projects.activity"]',true), 'Project identities must remain private';
+  assert public.sync_validate_day_v2(jsonb_build_object('schemaVersion','2','aggregationVersion',1,'date',current_date::text,'revision',1,
+    'activeMs',0,'editCount',0,'linesAdded',0,'linesRemoved',0,'sessionDays',0,'sessionStarts',0,'incompleteSessionStarts',0,'fileCount',0,'projectCount',0,'languageCount',0,
+    'languages','[]'::jsonb,'projects','[]'::jsonb,'projectOverflow','{"projectCount":0,"activeMs":0,"editCount":0,"linesAdded":0,"linesRemoved":0}'::jsonb,
+    'sessionDurations','{"count":0,"activeMs":0,"editCount":0,"linesAdded":0,"linesRemoved":0,"minActiveMs":null,"maxActiveMs":null,"histogram":[0,0,0,0,0,0,0,0,0]}'::jsonb,
+    'hourlyUtc',null,'coverage',jsonb_build_object('source','sessions-v1','dateBasis','collector-local','firstObservedDate',null,'lastObservedDate',null,'uploadFromDate',current_date::text,'historyCompleteness','unknown','partial',true))), 'Valid empty v2 aggregate rejected';
+  assert not public.sync_validate_day_v2(null) and not public.sync_validate_day_v2('{"schemaVersion":"3"}'), 'Invalid v2 aggregate accepted';
   assert exists(select 1 from information_schema.columns where table_schema='public' and table_name='extension_connections' and column_name='scope'), 'Missing connection scope';
   assert exists(select 1 from information_schema.columns where table_schema='public' and table_name='extension_auth_codes' and column_name='scope'), 'Missing code scope';
   assert exists (

@@ -6,6 +6,13 @@ export async function testProductionVerifier(executeSql, verifier) {
     .replace(/^rollback;$/m, "");
   const scenarios = [
     { name: "explicit grants", setup: "" },
+    { name: "private v2 summary accidentally public", setup: "grant execute on function public.sync_private_summary_v2(text,date) to anon;", error: "Incorrect anon grant: sync_private_summary_v2" },
+    { name: "v2 reducer exposed to browser", setup: "grant execute on function public.sync_aggregate_v2(uuid,date,date) to authenticated;", error: "Incorrect authenticated grant: sync_aggregate_v2" },
+    { name: "v2 consent exposed anonymously", setup: "grant execute on function public.extension_authorize_stats_v2(text,text) to public;", error: "Incorrect anon grant: extension_authorize_stats_v2" },
+    { name: "private export exposed anonymously", setup: "grant execute on function public.sync_export_v2(date,uuid) to anon;", error: "Incorrect anon grant: sync_export_v2" },
+    { name: "capability function missing", setup: "drop function public.sync_capabilities(text);", error: "Missing function: sync_capabilities" },
+    { name: "unsafe v2 search path", setup: "alter function public.sync_private_summary_v2(text,date) set search_path=public;", error: "Unsafe v2 function execution context" },
+    { name: "publication schedule enabled by default", setup: "alter table public.sync_privacy alter column publish_schedule set default true;", error: "Schedule publication must default off" },
     {
       name: "hosted DML grants with RLS denial",
       setup: `grant insert, update, delete on public.profiles to anon;
