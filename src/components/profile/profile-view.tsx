@@ -6,6 +6,7 @@ import { Avatar } from "@/components/profile/avatar";
 import { ProfileLayoutEditor } from "@/components/profile/profile-layout-editor";
 import { ProfileModules } from "@/components/profile/profile-modules";
 import { ProfileBackground } from "@/components/profile/profile-background";
+import { Crosshair } from "@/components/annotations/sketch";
 import { AppNavbar } from "@/components/ui/app-navbar";
 import { Logo } from "@/components/ui/logo";
 import {
@@ -39,7 +40,7 @@ export function ProfileView({
     <main className="relative isolate min-h-screen overflow-x-hidden bg-[#11110d] text-[#edeae0]">
       <ProfileBackground style={backgroundStyle} />
 
-      <AppNavbar>
+      <AppNavbar rails>
         {isOwner && !isExample ? (
           <>
             <Link
@@ -68,14 +69,15 @@ export function ProfileView({
         )}
       </AppNavbar>
 
-      <div className="relative z-10 mx-auto profile-frame max-w-[1080px] py-10 sm:py-16">
-        {isExample && (
-          <p className="mb-8 border-l-2 border-[#55a7ff] pl-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[#aaa69a]">
-            Example profile
-          </p>
-        )}
+      <div className="relative z-10 mx-auto profile-frame max-w-[1080px] pb-10 sm:pb-16">
+        <div className="profile-inset flex items-center justify-between gap-4 border-b border-[#24241f] py-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[#858177]">
+          <p className={isExample ? "text-[#aaa69a]" : ""}>{isExample ? "Example profile · representative data" : "Developer profile"}</p>
+          <p className="truncate normal-case tracking-normal text-[#55a7ff]">/u/{profile.username}</p>
+        </div>
 
-        <header className="profile-inset border-b border-[#2b2a24] pb-10 sm:pb-12">
+        <header className="profile-inset relative border-b border-[#2b2a24] pb-10 pt-10 sm:pb-12 sm:pt-12">
+          <Crosshair className="profile-mark profile-mark-left" />
+          <Crosshair className="profile-mark profile-mark-right" />
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
             <Avatar name={name} src={profile.avatar_url} />
 

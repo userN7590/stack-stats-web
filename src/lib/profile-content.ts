@@ -3,6 +3,7 @@ import { datasetRegistry, metricRegistry, publicMetricIds, type PublicMetricId, 
 import { appearanceSchema, type ChartAppearance } from "@/lib/visualization";
 import { activityShares, type ActivityCategory, type HourlyActivity } from "@/lib/sync-datasets";
 import { getLanguageDisplayName } from "@/lib/language-display";
+import { formatDurationMs } from "@/lib/format";
 import type { PublicProfile } from "@/lib/types";
 
 export const contentSizes = ["full", "two_thirds", "half", "third"] as const;
@@ -11,6 +12,15 @@ const scalarMetric = z.enum(publicMetricIds).refine(id => metricRegistry[id].sha
 export const measures = ["activeMs", "editCount", "linesAdded", "linesRemoved"] as const;
 export const measureLabels = { activeMs: "Coding time", editCount: "Content changes", linesAdded: "Lines added", linesRemoved: "Lines removed" };
 export type Measure = typeof measures[number];
+/**
+ * `utc-day-hours` is the future public activity-fingerprint shape. Nothing
+ * claims it yet: public profiles only have 24 aggregate UTC bins. Enabling it
+ * needs, in order: an explicit approved public day×hour projection (with
+ * schedule consent) and its SQL allowlist, a `profileDatasets` entry with a
+ * real adapter to `FingerprintInputDay[]` (see `@/lib/activity-fingerprint`),
+ * and a `waterfall` renderer here that renders `ActivityFingerprint`. The v3
+ * module/config shape does not change. Never feed it private owner rows.
+ */
 export type DataShape = "shares" | "daily-series" | "duration-buckets" | "utc-hours" | "utc-day-hours";
 
 // The dataset identity survives new presentations. Shape describes the approved
@@ -93,11 +103,7 @@ export function publicMetricState(profile: PublicProfile, id: PublicMetricId) {
 }
 export function formatMetricValue(value: number, unit: Unit): string {
   if (unit !== "milliseconds") return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
-  if (value === 0) return "0s";
-  if (value < 1000) return "<1s";
-  if (value < 60_000) return `${Math.floor(value / 1000)}s`;
-  const minutes = Math.floor(value / 60_000);
-  return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60).toLocaleString("en-US")}h${minutes % 60 ? ` ${minutes % 60}m` : ""}`;
+  return formatDurationMs(value);
 }
 export type DataPoint = { id: string; label: string; value: number };
 export function datasetPoints(profile: PublicProfile, config: DatasetConfig): DataPoint[] {

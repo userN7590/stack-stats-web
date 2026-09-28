@@ -25,6 +25,15 @@ export function formatCodingTime(totalMinutes: number) {
     : `${formatNumber(hours)}h`;
 }
 
+/** Display precision only: floors to whole seconds/minutes. */
+export function formatDurationMs(value: number) {
+  if (value === 0) return "0s";
+  if (value < 1000) return "<1s";
+  if (value < 60_000) return `${Math.floor(value / 1000)}s`;
+  const minutes = Math.floor(value / 60_000);
+  return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60).toLocaleString("en-US")}h${minutes % 60 ? ` ${minutes % 60}m` : ""}`;
+}
+
 export function getInitials(name: string) {
   return name
     .split(/\s+/)

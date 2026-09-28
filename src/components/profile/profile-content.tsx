@@ -109,7 +109,8 @@ function ActivityGraphic({ points, config, format, color }: { points: DataPoint[
     ? points.length === 1 ? 270 : 85 + (Date.parse(points[index].id) - from) / (to - from || 1) * 370
     : 85 + ((daily ? (Date.parse(points[index].id) - from) / 86_400_000 : index) + 0.5) / slots * 370;
   const y = (value: number) => 210 - value / (maximum || 1) * 165;
-  return <figure><svg viewBox="0 0 510 265" role="img" aria-label={`${contentRenderers[config.renderer].label}: ${metricRegistry[config.metric].label}. Exact values available below.`} className="block w-full">
+  // Height cap keeps axis text near its design size in wide sections.
+  return <figure><svg viewBox="0 0 510 265" preserveAspectRatio="xMinYMin meet" role="img" aria-label={`${contentRenderers[config.renderer].label}: ${metricRegistry[config.metric].label}. Exact values available below.`} className="block max-h-[340px] w-full">
     {[0, 0.5, 1].map(fraction => <g key={fraction}><line x1="85" x2="475" y1={y(maximum * fraction)} y2={y(maximum * fraction)} stroke="#2b2a24" /><text x="78" y={y(maximum * fraction) + 4} textAnchor="end" fill="#aaa69a" fontSize="14">{axisLabel(maximum * fraction)}</text></g>)}
     {points.map((point, index) => <g key={point.id}><title>{`${point.label}: ${format(point.value)}`}</title>
       {config.renderer === "line" ? <>
