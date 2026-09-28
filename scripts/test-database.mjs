@@ -5,6 +5,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout } from "node:timers/promises";
 import { testProductionVerifier } from "./test-production-verifier.mjs";
 import { testProfileVisualizationUpgrade } from "./test-profile-visualization-upgrade.mjs";
+import { testProfileContentUpgrade } from "./test-profile-content-upgrade.mjs";
+import { testProfileContentContract } from "./test-profile-content-contract.mjs";
 import { testSyncV2Contract } from "./test-sync-v2-contract.mjs";
 import { testSyncV2Upgrade } from "./test-sync-v2-upgrade.mjs";
 
@@ -46,6 +48,9 @@ try {
       } else if (filename === "20260927000000_sync_daily_v2.sql") {
         await testSyncV2Upgrade(sql, migration,
           readFileSync(new URL("../supabase/verify-sync-v2-preflight.sql", import.meta.url), "utf8"));
+      } else if (filename === "20260928000000_profile_content.sql") {
+        await testProfileContentUpgrade(sql, migration,
+          readFileSync(new URL("../supabase/verify-profile-content-preflight.sql", import.meta.url), "utf8"));
       } else {
         sql(migration);
       }
@@ -90,6 +95,7 @@ try {
   }
   const verifier = readFileSync(new URL("../supabase/verify-production.sql", import.meta.url), "utf8");
   await testSyncV2Contract(sql);
+  await testProfileContentContract(sql);
   sql(verifier);
   console.log("PASS production schema/permission assertions");
   await testProductionVerifier(sql, verifier);

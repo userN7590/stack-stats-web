@@ -12,7 +12,7 @@ import {
   getDisplayFontClass,
   normalizeBackgroundStyle,
 } from "@/lib/appearance";
-import { normalizeProfileLayout } from "@/lib/profile-layout";
+import { getProfileLayout } from "@/lib/profile-layout";
 import type { PublicProfile } from "@/lib/types";
 
 type ProfileViewProps = {
@@ -33,7 +33,7 @@ export function ProfileView({
   const displayFontClass = getDisplayFontClass(profile.display_font);
   const backgroundStyle = normalizeBackgroundStyle(profile.background_style);
   const editing = isOwner && !isExample && customize;
-  const layout = normalizeProfileLayout(profile.profile_layout);
+  const layout = getProfileLayout(profile);
 
   return (
     <main className="relative isolate min-h-screen overflow-x-hidden bg-[#11110d] text-[#edeae0]">
@@ -68,14 +68,14 @@ export function ProfileView({
         )}
       </AppNavbar>
 
-      <div className="relative z-10 mx-auto max-w-[840px] px-5 py-10 sm:px-8 sm:py-16">
+      <div className="relative z-10 mx-auto profile-frame max-w-[1080px] py-10 sm:py-16">
         {isExample && (
           <p className="mb-8 border-l-2 border-[#55a7ff] pl-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[#aaa69a]">
             Example profile
           </p>
         )}
 
-        <header className="border-b border-[#2b2a24] pb-10 sm:pb-12">
+        <header className="profile-inset border-b border-[#2b2a24] pb-10 sm:pb-12">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
             <Avatar name={name} src={profile.avatar_url} />
 
@@ -123,7 +123,7 @@ export function ProfileView({
           <ProfileModules profile={profile} layout={layout} isOwner={isOwner && !isExample} />
         )}
 
-        <footer className="flex flex-col gap-4 border-t border-[#2b2a24] py-7 text-[11px] text-[#858177] sm:flex-row sm:items-center sm:justify-between">
+        <footer className="profile-inset flex flex-col gap-4 border-t border-[#2b2a24] py-7 text-[11px] text-[#858177] sm:flex-row sm:items-center sm:justify-between">
           <p>
             {isSynced
               ? "Statistics are automatically tracked by Stack Stats."

@@ -107,7 +107,7 @@ begin
   perform public.update_profile_layout(layout);
 
   foreach invalid in array array[
-    layout || '{"version":1}', layout || '{"version":3}', layout || '{"version":"2"}', layout || '{"extra":true}',
+    layout || '{"version":1}', layout || '{"version":4}', layout || '{"version":"2"}', layout || '{"extra":true}',
     layout #- '{modules,0}', layout #- '{modules,0,visible}', layout #- '{modules,0,size}',
     jsonb_set(layout, '{modules,0,type}', '"languages"'),
     jsonb_set(layout, '{modules,0,type}', '"future_module"'),

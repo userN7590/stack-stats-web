@@ -5,12 +5,12 @@ import { CSS } from "@dnd-kit/utilities";
 import { Check, ChevronDown, ChevronUp, EyeOff, GripVertical, MoreHorizontal } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { getModuleKey, getModuleLabel, moduleDefinitions, type ModuleSize, type ProfileModule } from "@/lib/profile-layout";
+import { getModuleKey, getModuleLabel, moduleDefinitions, moduleSpan, moduleSizeLabels, type ModuleSize, type ProfileModule } from "@/lib/profile-layout";
 
 export const sectionIconButton = "inline-flex size-11 shrink-0 items-center justify-center rounded-[3px] text-[#aaa69a] transition hover:bg-[#24231d] hover:text-[#55a7ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] disabled:cursor-not-allowed disabled:opacity-35 aria-disabled:cursor-not-allowed aria-disabled:opacity-35";
-export const sectionSurface = "min-w-0 rounded-[4px] border bg-[#11110d] p-3 sm:p-5";
+export const sectionSurface = "profile-grid-section min-w-0 bg-[#11110d]";
 
-export function SortableProfileSection({ module, index, count, disabled, sectionRef, onShift, onHide, onSize, children }: {
+export function SortableProfileSection({ module, index, count, disabled, sectionRef, onShift, onHide, onSize, onEdit, onRemove, children }: {
   module: ProfileModule;
   index: number;
   count: number;
@@ -19,6 +19,8 @@ export function SortableProfileSection({ module, index, count, disabled, section
   onShift: (direction: -1 | 1) => void;
   onHide: () => void;
   onSize: (size: ModuleSize) => void;
+  onEdit?: () => void;
+  onRemove?: () => void;
   children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: getModuleKey(module), disabled });
@@ -51,7 +53,7 @@ export function SortableProfileSection({ module, index, count, disabled, section
       data-profile-section={getModuleKey(module)}
       data-dragging={isDragging || undefined}
       style={{ transform: CSS.Translate.toString(transform), transition, zIndex: options ? 10 : undefined }}
-      className={`${sectionSurface} relative border-[#3b3931] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] motion-reduce:!transition-none ${isDragging ? "border-dashed border-[#55a7ff] opacity-30" : ""} ${module.size === "full" ? "sm:col-span-2" : ""}`}
+      className={`${sectionSurface} relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] motion-reduce:!transition-none ${isDragging ? "border-dashed border-[#55a7ff] opacity-30" : ""} ${moduleSpan(module.size)}`}
     >
       <div className="mb-4 flex min-w-0 items-center gap-1 border-b border-[#2b2a24] pb-2">
         <button
@@ -76,17 +78,19 @@ export function SortableProfileSection({ module, index, count, disabled, section
             <button ref={trigger} type="button" className={sectionIconButton} disabled={disabled} aria-label={`${label} section options`} title="Section options" aria-expanded={options} aria-controls={optionsId} onClick={() => setOptions(!options)}><MoreHorizontal className="size-5" aria-hidden="true" /></button>
             {options && (
               <div ref={menu} id={optionsId} role="group" aria-label={`${label} section options`} className="absolute right-0 top-full z-10 w-56 rounded-[4px] border border-[#444239] bg-[#1b1b15] p-2 shadow-xl">
+                {onEdit && <button type="button" className={`${sectionIconButton} min-h-11 w-full justify-start px-3 text-xs`} onClick={() => { setOptions(false); onEdit(); }}>Edit section</button>}
                 {moduleDefinitions[module.type].sizes.length > 1 && (
                   <div role="group" aria-label={`${label} width`} className="mb-2 border-b border-[#3b3931] pb-2">
                     <p className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[#858177]">Section width</p>
                     {moduleDefinitions[module.type].sizes.map((size) => (
                       <button key={size} type="button" className={`${sectionIconButton} h-auto min-h-11 w-full justify-start gap-2 px-3 text-xs`} aria-label={`Set ${size} width`} aria-pressed={module.size === size} disabled={disabled} onClick={() => { onSize(size); closeOptions(); }}>
-                        <Check className={`size-4 ${module.size === size ? "text-[#55a7ff]" : "invisible"}`} aria-hidden="true" />{size === "full" ? "Full width" : "Half width"}
+                        <Check className={`size-4 ${module.size === size ? "text-[#55a7ff]" : "invisible"}`} aria-hidden="true" />{moduleSizeLabels[size]}
                       </button>
                     ))}
                   </div>
                 )}
                 <button type="button" className={`${sectionIconButton} h-auto min-h-11 w-full justify-start gap-2 px-3 text-xs`} aria-label={`Hide ${label} section`} disabled={disabled || count === 1} onClick={onHide}><EyeOff className="size-4" aria-hidden="true" />Hide section</button>
+                {onRemove && <button type="button" className={`${sectionIconButton} min-h-11 w-full justify-start px-3 text-xs`} disabled={disabled || count === 1} onClick={onRemove}>Remove section</button>}
                 {count === 1 && <p className="px-3 pb-2 text-xs text-[#969287]">Keep at least one section.</p>}
               </div>
             )}

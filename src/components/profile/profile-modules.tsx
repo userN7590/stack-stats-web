@@ -1,10 +1,11 @@
+import { ProfileContent } from "@/components/profile/profile-content";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { VisualizationSection } from "@/components/profile/visualizations/visualization-section";
 import { LanguageDonutChart } from "@/components/profile/language-donut-chart";
 import { formatDate, formatNumber, getHostname } from "@/lib/format";
-import { getModuleKey, getModuleLabel, type ModuleType, type ProfileLayout, type ProfileModule } from "@/lib/profile-layout";
+import { getModuleKey, getModuleLabel, moduleSpan, isContentModule, type ModuleType, type ProfileLayout, type ProfileModule } from "@/lib/profile-layout";
 import { getProfileMetrics } from "@/lib/profile-metrics";
 import type { PublicProfile } from "@/lib/types";
 import { publishedLinesAvailable } from "@/lib/synced-profile";
@@ -18,7 +19,7 @@ export function hasModuleContent(type: ModuleType, profile: PublicProfile) {
 }
 
 // New presentations plug in here; data adapters remain outside the renderers.
-const renderers: Record<ModuleType, (props: ModuleProps) => ReactNode> = {
+const renderers: Record<Exclude<ModuleType, "single_stat" | "stat_grid" | "dataset" | "document" | "link_collection">, (props: ModuleProps) => ReactNode> = {
   visualization: ({ profile, module }) => module.type === "visualization" ? <VisualizationSection profile={profile} config={module.config} /> : null,
   stats: HeadlineStats,
   code_changes: CodeChanges,
@@ -27,6 +28,7 @@ const renderers: Record<ModuleType, (props: ModuleProps) => ReactNode> = {
 };
 
 export function ProfileModuleContent(props: ModuleProps) {
+  if (isContentModule(props.module)) return <ProfileContent profile={props.profile} module={props.module} />;
   const Renderer = renderers[props.module.type];
   return <Renderer {...props} />;
 }
@@ -45,13 +47,13 @@ export function ProfileModules({ profile, layout, isOwner = false }: {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+    <div className="profile-grid">
       {visibleModules.map((module) => (
         <section
           key={getModuleKey(module)}
           data-profile-section={getModuleKey(module)}
           aria-label={getModuleLabel(module)}
-          className={`min-w-0 border-b border-[#2b2a24] py-8 sm:py-10 ${module.size === "full" ? "sm:col-span-2" : ""}`}
+          className={`profile-grid-section ${moduleSpan(module.size)}`}
         >
           <ProfileModuleContent profile={profile} module={module} />
         </section>

@@ -7,30 +7,35 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ProfileContentEditor } from "@/components/profile/profile-content-editor";
+import type { ContentType } from "@/lib/profile-content";
 import { VisualizationEditor } from "@/components/profile/visualizations/visualization-editor";
-import { defaultVisualizationConfig } from "@/lib/visualization";
 import { ProfileSectionPicker } from "@/components/profile/profile-section-picker";
 import { sectionSurface, SortableProfileSection } from "@/components/profile/sortable-profile-section";
 import { ProfileModuleContent, ProfileModules } from "@/components/profile/profile-modules";
 import {
-  addVisualization,
+  addContentModule,
+  isContentModule,
+  replaceContentModule,
+  removeModule,
   getModuleKey,
   getModuleLabel,
   hasUnsupportedVisualizations,
   removeVisualization,
   setVisualizationConfig,
-  getDefaultProfileLayout,
+  getDefaultLayoutForProfile,
+  getProfileLayout,
   isUnsupportedLayoutVersion,
   moveModule,
   moveModuleTo,
   moveStat,
-  normalizeProfileLayout,
   profileLayoutSchema,
   setModuleSize,
   setModuleVisibility,
   statIds,
   toggleStat,
   type ProfileLayout,
+  type ProfileModule,
 } from "@/lib/profile-layout";
 import { getProfileMetrics } from "@/lib/profile-metrics";
 import { createClient } from "@/lib/supabase/client";
@@ -41,10 +46,11 @@ const iconClass = "size-3.5 shrink-0";
 
 export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
   const router = useRouter();
-  const [saved, setSaved] = useState(() => normalizeProfileLayout(profile.profile_layout));
+  const [saved, setSaved] = useState(() => getProfileLayout(profile));
   const [draft, setDraft] = useState(saved);
   const [activeType, setActiveType] = useState<string | null>(null);
-  const [newVisualization, setNewVisualization] = useState<string | null>(null);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<ProfileModule | null>(null);
   const [preview, setPreview] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -115,13 +121,19 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
     return section ? getModuleLabel(section) : "Section";
   }
 
-  function createVisualization() {
-    const id = `viz_${crypto.randomUUID()}`;
-    const config = defaultVisualizationConfig(profile.languages.length ? "language_share" : "line_changes");
-    update(addVisualization(draft, id, config), "Visualization added. Choose its data, style, and colors below.");
-    setNewVisualization(id);
+  function createContent(type: ContentType) {
+    const id = `sec_${crypto.randomUUID()}`;
+    const next = addContentModule(draft, type, id);
+    if (next === draft) return;
+    update(next, "Section added. Choose its content below.");
+    setEditingSection(id);
     setAdding(false);
-    requestAnimationFrame(() => sections.current[id]?.focus());
+  }
+
+  function closeContentEditor() {
+    const key = editingSection;
+    setEditingSection(null);
+    if (key) sections.current[key]?.querySelector<HTMLButtonElement>('button[title="Section options"]')?.focus();
   }
 
   function closePicker() {
@@ -159,6 +171,7 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
         return;
       }
       setSaved(result.data);
+      setRemoved(null);
       setAnnouncement("Profile layout saved.");
       router.replace(profileHref, { scroll: false });
       router.refresh();
@@ -171,14 +184,14 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
 
   return (
     <div className="py-6" aria-label="Customize profile">
-      <div className="sm:sticky top-0 z-20 -mx-2 rounded-[4px] border border-[#3b3931] bg-[#171712]/95 p-4 backdrop-blur sm:-mx-4">
+      <div className="profile-editor-toolbar sm:sticky top-0 z-20 border-y border-[#3b3931] bg-[#171712] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-mono text-sm text-[#edeae0]">Make this profile yours</h2>
             <p className="mt-1 text-xs text-[#969287]">{dirty ? "Unsaved changes" : "Drag the grips to arrange your profile. Save when it feels right."}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={buttonClass} disabled={saving} onClick={() => router.replace(profileHref, { scroll: false })}>Cancel</button>
+            <button type="button" className={buttonClass} disabled={saving} onClick={() => { if (!dirty || window.confirm("Discard unsaved layout changes?")) router.replace(profileHref, { scroll: false }); }}>Cancel</button>
             <button type="button" className="inline-flex min-h-10 items-center justify-center rounded-[3px] border border-[#55a7ff] bg-[#55a7ff] px-4 font-mono text-xs font-semibold text-[#11110d] transition hover:bg-[#78b8ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171712] disabled:cursor-not-allowed disabled:opacity-40" disabled={!dirty || saving || unsupported} onClick={save}>
               {saving ? "Saving…" : "Save layout"}
             </button>
@@ -187,7 +200,7 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button ref={addButton} type="button" className={buttonClass} disabled={saving || unsupported || preview} aria-expanded={adding} aria-controls="available-profile-sections" onClick={() => setAdding(!adding)}><Plus className={iconClass} />Add section</button>
           <button type="button" className={buttonClass} disabled={saving} aria-pressed={preview} onClick={() => { setPreview(!preview); setAdding(false); }}><Eye className={iconClass} />{preview ? "Edit sections" : "Preview"}</button>
-          <button type="button" className={buttonClass} disabled={saving || unsupported} onClick={() => update(getDefaultProfileLayout(), "Default layout restored. Save to apply it.")}><RotateCcw className={iconClass} />Reset layout</button>
+          <button type="button" className={buttonClass} disabled={saving || unsupported} onClick={() => { update(getDefaultLayoutForProfile(profile), "Default layout restored. Save to apply it."); setRemoved(null); setEditingSection(null); }}><RotateCcw className={iconClass} />Reset layout</button>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] text-[#aaa69a]">
           <Link className="underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55a7ff]" href="/dashboard?section=identity">Profile details</Link>
@@ -197,12 +210,13 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
         {error && <p role="alert" className="mt-3 text-sm text-[#e58b83]">{error}</p>}
       </div>
 
-      <p className="mt-4 text-xs leading-5 text-[#858177]">Hiding a section changes how your profile looks. Manage what you publish in Sync settings.</p>
+      <p className="profile-inset mt-4 text-xs leading-5 text-[#858177]">Hiding a section changes how your profile looks. Manage what you publish in Sync settings.</p>
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</p>
 
+      {removed && <div role="status" className="profile-inset mt-4 flex items-center gap-3 text-xs text-[#aaa69a]">Section removed.<button type="button" className={buttonClass} disabled={saving || unsupported || draft.modules.length >= 20} onClick={() => { update({ version: 3, modules: [...draft.modules, removed] }, "Section restored at the end."); setRemoved(null); }}>Undo removal</button></div>}
       {unsupported && <p role="alert" className="mt-5 border border-[#3b3931] p-4 text-sm text-[#d8aa54]">This layout was saved with a newer version of Stack Stats. Editing is unavailable here, so your saved layout stays intact.</p>}
 
-      {adding && <ProfileSectionPicker modules={draft.modules} disabled={saving} onChoose={restore} onAddVisualization={createVisualization} onClose={closePicker} />}
+      {adding && <ProfileSectionPicker modules={draft.modules} disabled={saving} onChoose={restore} onAddContent={createContent} onClose={closePicker} />}
 
       {preview || unsupported ? <ProfileModules profile={profile} layout={draft} /> : (
         <DndContext
@@ -223,7 +237,7 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
           }}
         >
           <SortableContext items={visible.map(getModuleKey)} strategy={rectSortingStrategy}>
-            <div className="mt-6 grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
+            <div className="profile-grid mt-6">
               {visible.map((module, index) => (
                 <SortableProfileSection
                   key={getModuleKey(module)}
@@ -234,11 +248,14 @@ export function ProfileLayoutEditor({ profile }: { profile: PublicProfile }) {
                   sectionRef={(element) => { sections.current[getModuleKey(module)] = element; }}
                   onShift={(direction) => reorder(getModuleKey(module), direction)}
                   onHide={() => hide(getModuleKey(module))}
+                  onEdit={isContentModule(module) ? () => setEditingSection(getModuleKey(module)) : undefined}
+                  onRemove={() => { const key = getModuleKey(module); update(removeModule(draft, key), "Section removed. Undo removal to restore it."); setRemoved(module); addButton.current?.focus(); }}
                   onSize={(size) => update(setModuleSize(draft, getModuleKey(module), size), `${getModuleLabel(module)} set to ${size} width.`)}
                 >
+                  {isContentModule(module) && editingSection === module.id && <ProfileContentEditor profile={profile} module={module} disabled={saving} onChange={section => update(replaceContentModule(draft, section), "Section updated. Save to apply your layout.")} onClose={closeContentEditor} />}
                   {module.type === "visualization" && <VisualizationEditor
                     profile={profile} config={module.config} disabled={saving}
-                    initialOpen={module.id === newVisualization}
+                    initialOpen={false}
                     canRemove={visible.length > 1 || !module.visible}
                     onChange={(config) => update(setVisualizationConfig(draft, module.id, config), "Visualization updated. Save to publish your changes.")}
                     onRemove={() => { update(removeVisualization(draft, module.id), "Visualization removed."); addButton.current?.focus(); }}

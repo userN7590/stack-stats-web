@@ -183,9 +183,9 @@ describe("modular profile presentation", () => {
     const languageSection = html.match(/<section[^>]*data-profile-section="languages"[^>]*>/)?.[0];
     const statsSection = html.match(/<section[^>]*data-profile-section="stats"[^>]*>/)?.[0];
     expect(languageSection).toBeDefined();
-    expect(languageSection).not.toContain("sm:col-span-2");
+    expect(languageSection).toContain("profile-span-half");
     expect(html).not.toContain("sm:grid-cols-[190px_1fr]");
-    expect(statsSection).toContain("sm:col-span-2");
+    expect(statsSection).toContain("profile-span-full");
     expect(profile).toEqual(before);
   });
 
@@ -193,7 +193,7 @@ describe("modular profile presentation", () => {
     { label: "missing", raw: undefined },
     { label: "null", raw: null },
     { label: "malformed", raw: { version: 1, modules: "broken" } },
-    { label: "future", raw: { version: 3, modules: [{ type: "future_chart" }] } },
+    { label: "future", raw: { version: 4, modules: [{ type: "future_chart" }] } },
     { label: "unknown modules", raw: { version: 1, modules: [{ type: "unknown", visible: true }] } },
   ])("renders a complete default profile for $label configuration", ({ raw }) => {
     const html = renderToStaticMarkup(<ProfileView profile={{ ...withLinks, profile_layout: raw }} />);
@@ -272,7 +272,7 @@ describe("modular profile presentation", () => {
   });
 
   it("keeps future saved layouts intact and disables modifying controls in the fallback editor", () => {
-    const future = { version: 3, modules: [{ type: "future_chart", source: "future_source" }] };
+    const future = { version: 4, modules: [{ type: "future_chart", source: "future_source" }] };
     const before = structuredClone(future);
     const html = renderToStaticMarkup(<ProfileView profile={{ ...withLinks, profile_layout: future }} isOwner customize />);
     expect(html).toContain("This layout was saved with a newer version of Stack Stats.");

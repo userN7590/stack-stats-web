@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { contentModuleSchema, contentSizes, newContentModule, publicMetricState, scalarMetricIds, defaultDatasetConfig, type ContentType, type ContentModule } from "@/lib/profile-content";
+import type { PublicProfile } from "@/lib/types";
+import { metricRegistry } from "@/lib/metric-registry";
 
 import { defaultVisualizationConfig, normalizeVisualizationConfig, rendererDefinitions, visualizationConfigSchema, type VisualizationConfig } from "@/lib/visualization";
 
@@ -12,13 +15,19 @@ export const statIds = [
 ] as const;
 
 export type StatId = (typeof statIds)[number];
-export type ModuleType = "stats" | "code_changes" | "languages" | "links" | "visualization";
-export type ModuleSize = "full" | "half";
+type LegacyModuleType = "stats" | "code_changes" | "languages" | "links" | "visualization";
+export type ModuleType = LegacyModuleType | ContentType;
+export type ModuleSize = typeof contentSizes[number];
 
 export const moduleDefinitions: Record<
   ModuleType,
   { label: string; description: string; sizes: readonly ModuleSize[] }
 > = {
+  single_stat: { label: "Single stat", description: "One metric, with your chosen presentation.", sizes: contentSizes },
+  stat_grid: { label: "Stat grid", description: "Choose a metric for each cell in a shared grid.", sizes: contentSizes },
+  dataset: { label: "Dataset visualization", description: "Choose activity data, then how to show it.", sizes: contentSizes },
+  link_collection: { label: "Links", description: "Developer profiles, projects, research and websites.", sizes: contentSizes },
+  document: { label: "Document / PDF", description: "Link to a resume, research paper or technical document.", sizes: contentSizes },
   visualization: { label: "Visualization", description: "Show your activity in a style that feels like you.", sizes: ["full", "half"] },
   stats: {
     label: "Headline stats",
@@ -50,7 +59,7 @@ const statSelectionSchema = z
     message: "Choose each stat only once.",
   });
 
-const moduleSchema = z.discriminatedUnion("type", [
+const legacyModuleSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("visualization"),
     id: z.string().regex(/^viz_[a-z0-9-]{1,64}$/),
@@ -82,10 +91,10 @@ const moduleSchema = z.discriminatedUnion("type", [
 ]);
 
 /** Saving is strict; older or damaged stored layouts are handled by the reader below. */
-export const profileLayoutSchema = z
+const legacyLayoutSchema = z
   .strictObject({
     version: z.union([z.literal(1), z.literal(2)]),
-    modules: z.array(moduleSchema).min(4).max(10),
+    modules: z.array(legacyModuleSchema).min(4).max(10),
   })
   .superRefine((layout, context) => {
     const core = layout.modules.filter((module) => module.type !== "visualization");
@@ -108,8 +117,19 @@ export const profileLayoutSchema = z
     }
   });
 
-export type ProfileModule = z.infer<typeof moduleSchema>;
-export type ProfileLayout = z.infer<typeof profileLayoutSchema>;
+export const profileModuleSchema = z.union([legacyModuleSchema, contentModuleSchema]);
+const layoutV3Schema = z.strictObject({ version: z.literal(3), modules: z.array(profileModuleSchema).min(1).max(20) }).superRefine((layout, context) => {
+  const keys = layout.modules.map(getModuleKey);
+  if (new Set(keys).size !== keys.length || layout.modules.filter(module => module.type === "visualization").length > 6 || !layout.modules.some(module => module.visible)) {
+    context.addIssue({ code: "custom", path: ["modules"], message: "Each section needs a unique identity and at least one must remain visible." });
+  }
+});
+export const profileLayoutSchema = z.union([legacyLayoutSchema, layoutV3Schema]);
+export type ProfileModule = z.infer<typeof profileModuleSchema>;
+export type ProfileLayout = { version: 1 | 2 | 3; modules: ProfileModule[] };
+export function isContentModule(module: ProfileModule): module is ContentModule {
+  return "id" in module && module.type !== "visualization";
+}
 
 /** Every caller gets independent arrays, including the selected stats. */
 export function getDefaultProfileLayout(): ProfileLayout {
@@ -128,10 +148,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isModuleType(value: unknown): value is ModuleType {
+function isModuleType(value: unknown): value is LegacyModuleType {
   return (
     typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(moduleDefinitions, value)
+    ["stats", "code_changes", "languages", "links", "visualization"].includes(value)
   );
 }
 
@@ -141,7 +161,7 @@ function isStatId(value: unknown): value is StatId {
 
 /** A future layout can be displayed with defaults, but must not be overwritten by this editor. */
 export function isUnsupportedLayoutVersion(raw: unknown): boolean {
-  return isRecord(raw) && typeof raw.version === "number" && raw.version !== 1 && raw.version !== 2;
+  return isRecord(raw) && typeof raw.version === "number" && raw.version !== 1 && raw.version !== 2 && raw.version !== 3;
 }
 
 /**
@@ -149,6 +169,18 @@ export function isUnsupportedLayoutVersion(raw: unknown): boolean {
  * choices, omit unknown sections, and leave newly introduced sections hidden.
  */
 export function normalizeProfileLayout(raw: unknown): ProfileLayout {
+  if (isRecord(raw) && raw.version === 3 && Array.isArray(raw.modules)) {
+    const seen = new Set<string>();
+    const modules: ProfileModule[] = [];
+    for (const value of raw.modules.slice(0, 20)) {
+      const parsed = profileModuleSchema.safeParse(value);
+      if (!parsed.success || seen.has(getModuleKey(parsed.data))) continue;
+      seen.add(getModuleKey(parsed.data));
+      modules.push(parsed.data);
+    }
+    // Never substitute unrelated defaults for unknown/new v3 sections.
+    return { version: 3, modules };
+  }
   if (!isRecord(raw) || (raw.version !== 1 && raw.version !== 2) || !Array.isArray(raw.modules)) {
     return getDefaultProfileLayout();
   }
@@ -268,10 +300,11 @@ export function setModuleSize(
 ): ProfileLayout {
   const section = layout.modules.find((module) => getModuleKey(module) === type);
   if (!section || !moduleDefinitions[section.type].sizes.includes(size)) return layout;
+  if (!isContentModule(section) && size !== "full" && size !== "half") return layout;
   return {
     ...layout,
     modules: layout.modules.map((module) =>
-      getModuleKey(module) === type && module.type !== "stats" ? { ...module, size } : module,
+      getModuleKey(module) === type && module.type !== "stats" ? { ...module, size } as ProfileModule : module,
     ),
   };
 }
@@ -314,15 +347,18 @@ export function moveStat(
 
 
 export function getModuleKey(section: ProfileModule): string {
-  return section.type === "visualization" ? section.id : section.type;
+  return "id" in section ? section.id : section.type;
 }
 
 export function getModuleLabel(section: ProfileModule): string {
+  if (section.type === "single_stat" && section.metric) return metricRegistry[section.metric].label;
+  if (section.type === "dataset" && section.config) return metricRegistry[section.config.metric].label;
   return section.type === "visualization" ? rendererDefinitions[section.config.renderer].label : moduleDefinitions[section.type].label;
 }
 
 /** Unknown semantics are omitted publicly; the editor locks saves to preserve them. */
 export function hasUnsupportedVisualizations(raw: unknown): boolean {
+  if (isRecord(raw) && raw.version === 3) return !layoutV3Schema.safeParse(raw).success;
   if (!isRecord(raw) || raw.version !== 2 || !Array.isArray(raw.modules)) return false;
   return raw.modules.some((row) => isRecord(row) && (
     !isModuleType(row.type) || (row.type === "visualization" && !normalizeVisualizationConfig(row.config))
@@ -333,7 +369,7 @@ export function addVisualization(layout: ProfileLayout, id: string, config = def
   if (layout.modules.filter((module) => module.type === "visualization").length >= 6 ||
     layout.modules.some((module) => getModuleKey(module) === id) || !/^viz_[a-z0-9-]{1,64}$/.test(id) ||
     !visualizationConfigSchema.safeParse(config).success) return layout;
-  return { version: 2, modules: [...layout.modules, { type: "visualization", id, visible: true, size: "full", config }] };
+  return { version: layout.version === 3 ? 3 : 2, modules: [...layout.modules, { type: "visualization", id, visible: true, size: "full", config }] };
 }
 
 export function setVisualizationConfig(layout: ProfileLayout, id: string, config: VisualizationConfig): ProfileLayout {
@@ -344,4 +380,37 @@ export function setVisualizationConfig(layout: ProfileLayout, id: string, config
 export function removeVisualization(layout: ProfileLayout, id: string): ProfileLayout {
   if (!layout.modules.some((module) => getModuleKey(module) !== id && module.visible)) return layout;
   return { ...layout, modules: layout.modules.filter((module) => module.type !== "visualization" || module.id !== id) };
+}
+
+/** Adding content promotes only the envelope; existing sections are untouched. */
+export function addContentModule(layout: ProfileLayout, type: ContentType, id: string): ProfileLayout {
+  const next = { version: 3 as const, modules: [...layout.modules, newContentModule(type, id)] };
+  return profileLayoutSchema.safeParse(next).success ? next : layout;
+}
+export function replaceContentModule(layout: ProfileLayout, section: ContentModule): ProfileLayout {
+  const next = { ...layout, modules: layout.modules.map(module => getModuleKey(module) === section.id ? section : module) };
+  return profileLayoutSchema.safeParse(next).success ? next : layout;
+}
+export function removeModule(layout: ProfileLayout, key: string): ProfileLayout {
+  const next = { version: 3 as const, modules: layout.modules.filter(module => getModuleKey(module) !== key) };
+  return profileLayoutSchema.safeParse(next).success ? next : layout;
+}
+export const moduleSizeLabels: Record<ModuleSize, string> = { full: "Full width", two_thirds: "Two-thirds width", half: "Half width", third: "One-third width" };
+export function moduleSpan(size: ModuleSize) {
+  return { full: "profile-span-full", two_thirds: "profile-span-two-thirds", half: "profile-span-half", third: "profile-span-third" }[size];
+}
+
+/** A fresh selected-publication profile can start from its actual approved data.
+ * Manual and legacy publication keep their original defaults and semantics. */
+export function getDefaultLayoutForProfile(profile: PublicProfile): ProfileLayout {
+  if (!profile.published_metrics) return getDefaultProfileLayout();
+  const metrics = scalarMetricIds.filter(id => publicMetricState(profile, id).status === "ready").slice(0, 6);
+  const columns = metrics.length > 4 ? 3 : 2;
+  const modules: ProfileModule[] = [{ type: "stat_grid", id: "sec_default-stats", visible: true, size: "full", columns, rows: 2, cells: Array.from({ length: columns * 2 }, (_, index) => metrics[index] ?? null) }];
+  if (publicMetricState(profile, "languages.activity").status === "ready") modules.push({ type: "dataset", id: "sec_default-languages", visible: true, size: "full", config: defaultDatasetConfig("languages.activity") });
+  if (profile.github_url || profile.website_url) modules.push({ type: "links", visible: true, size: "full" });
+  return { version: 3, modules };
+}
+export function getProfileLayout(profile: PublicProfile): ProfileLayout {
+  return profile.profile_layout == null ? getDefaultLayoutForProfile(profile) : normalizeProfileLayout(profile.profile_layout);
 }

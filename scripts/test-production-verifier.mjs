@@ -6,6 +6,12 @@ export async function testProductionVerifier(executeSql, verifier) {
     .replace(/^rollback;$/m, "");
   const scenarios = [
     { name: "explicit grants", setup: "" },
+    { name: "layout CHECK bypass", setup: "alter table public.profiles drop constraint profiles_profile_layout_check; alter table public.profiles add constraint profiles_profile_layout_check check(true);", error: "Profile layout CHECK must enforce the active validator" },
+    { name: "missing v3 legacy helper", setup: "drop function public.profile_layout_v2_is_valid(jsonb);", error: "Missing function: profile_layout_v2_is_valid" },
+    { name: "v3 helper accidentally public", setup: "grant execute on function public.profile_layout_v2_is_valid(jsonb) to public;", error: "Incorrect anon grant: profile_layout_v2_is_valid" },
+    { name: "v3 helper bypasses RLS", setup: "alter function public.profile_layout_v2_is_valid(jsonb) security definer;", error: "Unsafe layout validator execution context" },
+    { name: "external URL validator grants drift", setup: "revoke execute on function public.profile_external_link_is_valid(text) from authenticated;", error: "Incorrect authenticated grant: profile_external_link_is_valid" },
+    { name: "unsafe external URL validation", setup: "create or replace function public.profile_external_link_is_valid(p_url text) returns boolean language sql immutable security invoker set search_path='' as 'select true';", error: "Unsafe external URL accepted" },
     { name: "private v2 summary accidentally public", setup: "grant execute on function public.sync_private_summary_v2(text,date) to anon;", error: "Incorrect anon grant: sync_private_summary_v2" },
     { name: "v2 reducer exposed to browser", setup: "grant execute on function public.sync_aggregate_v2(uuid,date,date) to authenticated;", error: "Incorrect authenticated grant: sync_aggregate_v2" },
     { name: "v2 consent exposed anonymously", setup: "grant execute on function public.extension_authorize_stats_v2(text,text) to public;", error: "Incorrect anon grant: extension_authorize_stats_v2" },

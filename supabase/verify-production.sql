@@ -11,6 +11,7 @@ declare
   permissive_count integer;
   layout_v1 jsonb := '{"version":1,"modules":[{"type":"links","visible":true,"size":"full"},{"type":"stats","visible":true,"size":"full","stats":["coding_minutes"]},{"type":"code_changes","visible":false,"size":"half"},{"type":"languages","visible":false,"size":"half"}]}';
   layout_v2 jsonb;
+  layout_v3 jsonb;
   owner_expressions text[] := array[
     'selectauth.uidasuid=user_id', 'selectauth.uid=user_id', 'auth.uid=user_id'
   ];
@@ -49,6 +50,8 @@ begin
     ('update_profile_layout(jsonb)',false,true),
     ('profile_layout_is_valid(jsonb)',false,true),
     ('profile_layout_v1_is_valid(jsonb)',false,true),
+    ('profile_layout_v2_is_valid(jsonb)',false,true),
+    ('profile_external_link_is_valid(text)',false,true),
     ('set_profile_updated_at()',false,false),
     ('extension_authorize_stats_v2(text,text)',false,true),
     ('sync_capabilities(text)',true,true),
@@ -110,6 +113,8 @@ begin
     where conrelid='public.profiles'::regclass
       and conname='profiles_profile_layout_check' and contype='c' and convalidated
   ), 'Missing validated profile layout constraint';
+  assert exists(select 1 from pg_constraint where conrelid='public.profiles'::regclass and conname='profiles_profile_layout_check'
+    and regexp_replace(lower(pg_get_constraintdef(oid)), '[[:space:]()]', '', 'g') in ('checkprofile_layout_is_validprofile_layout', 'checkpublic.profile_layout_is_validprofile_layout')), 'Profile layout CHECK must enforce the active validator';
   assert (select relrowsecurity from pg_class where oid='public.profiles'::regclass), 'Profiles RLS must remain enabled';
   -- Hosted Supabase may grant DML through default privileges. GRANT SELECT in
   -- our first migration does not revoke those pre-existing grants. Table ACLs
@@ -203,8 +208,27 @@ begin
   assert not public.profile_layout_v1_is_valid(layout_v2), 'Legacy helper must reject future layouts';
   assert not public.profile_layout_is_valid(jsonb_set(layout_v2, '{modules,4,config,renderer}', '"waterfall"')),
     'Incompatible visualization dataset and renderer must be rejected';
-  assert not public.profile_layout_is_valid(jsonb_set(layout_v2, '{version}', '3')),
+  assert not public.profile_layout_is_valid(jsonb_set(layout_v2, '{version}', '4')),
     'Unknown layout versions must be rejected on save';
+  layout_v3 := '{"version":3,"modules":[{"type":"single_stat","id":"sec_verify","visible":true,"size":"third","metric":"sessions.average_ms","style":"context"}]}';
+  assert public.profile_layout_v2_is_valid(layout_v2), 'Legacy v2 helper must preserve visualizations';
+  assert not public.profile_layout_v2_is_valid(layout_v3), 'Legacy v2 helper must reject v3';
+  assert public.profile_layout_is_valid(layout_v3), 'Data-first v3 configuration must be accepted';
+  assert not public.profile_layout_is_valid(jsonb_set(layout_v3,'{modules,0,metric}','"projects.known_count"')), 'Private metrics must not be accepted in public layouts';
+  assert not public.profile_layout_is_valid(jsonb_set(layout_v3,'{modules,0,metric}','"sessions.histogram"')), 'Dataset metrics must not be accepted as scalar stats';
+  assert public.profile_layout_is_valid('{"version":3,"modules":[{"type":"dataset","id":"sec_dataset","visible":true,"size":"two_thirds","config":{"dataset":"hourlyUtc","metric":"schedule.hourly_utc","renderer":"heatmap","measure":"activeMs","appearance":{"palette":"stack"}}}]}'), 'UTC dataset configuration must be accepted';
+  assert not public.profile_external_link_is_valid('javascript:alert(1)'), 'Unsafe external URL accepted';
+  assert not public.profile_external_link_is_valid('https://user:pass@example.com/a'), 'URL credentials accepted';
+  assert public.profile_external_link_is_valid('https://example.com/paper.pdf'), 'HTTPS document link rejected';
+  for item in select p.* from pg_proc p where p.oid in (
+    'public.profile_layout_is_valid(jsonb)'::regprocedure,
+    'public.profile_layout_v1_is_valid(jsonb)'::regprocedure,
+    'public.profile_layout_v2_is_valid(jsonb)'::regprocedure,
+    'public.profile_external_link_is_valid(text)'::regprocedure
+  ) loop
+    assert not item.prosecdef and item.provolatile='i' and item.proconfig=array['search_path=""']::text[], 'Unsafe layout validator execution context';
+    assert not exists(select 1 from aclexplode(coalesce(item.proacl,acldefault('f',item.proowner))) acl where acl.grantee=0 and acl.privilege_type='EXECUTE'), 'PUBLIC layout helper execution is forbidden';
+  end loop;
   raise notice 'Auth/sync/layout/visualization schema, RLS and grants passed. Verify migration history and run the browser/editor E2E separately.';
 end $$;
 

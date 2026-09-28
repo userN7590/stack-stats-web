@@ -91,3 +91,42 @@ input:-webkit-autofill:focus {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Profile coordinate system. Scoped to profiles; no homepage redesign. */
+.profile-frame {
+  --profile-rule: #24241f;
+  --profile-gutter: clamp(1rem, 3vw, 2rem);
+  width: calc(100% - 2rem);
+  border-inline: 1px solid var(--profile-rule);
+}
+.profile-inset { padding-inline: var(--profile-gutter); }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.profile-grid-section {
+  min-width: 0;
+  padding: 2.5rem var(--profile-gutter);
+  border-bottom: 1px solid var(--profile-rule, #24241f);
+  container-type: inline-size;
+}
+.profile-stat-grid { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid #2b2a24; border-left: 1px solid #2b2a24; }
+@container (min-width: 280px) {
+  .profile-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 650px) {
+  .profile-stat-grid[data-columns="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 768px) {
+  .profile-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .profile-grid-section { border-right: 1px solid var(--profile-rule, #24241f); }
+  .profile-span-full { grid-column: span 6; border-right: 0; }
+  .profile-span-two-thirds { grid-column: span 4; }
+  .profile-span-half { grid-column: span 3; }
+  .profile-span-third { grid-column: span 2; }
+}
+.profile-editor-toolbar { margin-inline: var(--profile-gutter); }
+.profile-field { width: 100%; min-height: 44px; border: 1px solid #444239; background: #171712; color: #edeae0; padding: 0.6rem; border-radius: 3px; }
+.profile-field:focus-visible { outline: 2px solid #55a7ff; outline-offset: 2px; }
+.profile-field option { background: #171712; color: #edeae0; }
+.profile-field option:disabled { color: #969287; }
+@media (prefers-reduced-motion: reduce) {
+  .profile-frame *, .profile-frame *::before, .profile-frame *::after { scroll-behavior: auto !important; transition: none !important; }
+}
