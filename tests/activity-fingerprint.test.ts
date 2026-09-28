@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  binPoint,
   buildFingerprint,
+  cardLayout,
   compactLayout,
   FINGERPRINT_HOURS,
   fingerprintDaysFromHourlyRows,
@@ -10,7 +12,10 @@ import {
   formatUtcHourRange,
   heroLayout,
   hourX,
+  localStipplePath,
+  nearestLine,
   nearestRidge,
+  pickRidge,
   REPRESENTATIVE_FROM,
   REPRESENTATIVE_TO,
   representativeFingerprint,
@@ -19,7 +24,10 @@ import {
   ridgePath,
   stipplePath,
   summarizeFingerprint,
+  synthesizeFingerprintDays,
+  visibleRidgeAt,
 } from "@/lib/activity-fingerprint";
+import { exampleDevelopers } from "@/lib/example-developers";
 
 const hours = (fill: (hour: number) => number) => Array.from({ length: FINGERPRINT_HOURS }, (_, hour) => fill(hour));
 const numbers = (path: string) => (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
@@ -177,7 +185,100 @@ describe("activity fingerprint geometry", () => {
   });
 });
 
+describe("visible-surface selection with hysteresis", () => {
+  // Twelve dates; only the front one has a tall peak at 12:00, which rises
+  // over (and hides) the flat ridges behind it.
+  const model = buildFingerprint(Array.from({ length: 12 }, (_, index) => ({
+    date: `2026-09-${String(index + 1).padStart(2, "0")}`, hours: hours((hour) => (index === 11 && hour === 12 ? 3_600_000 : 0)),
+  })));
+  const frame = fingerprintFrame(model, heroLayout);
+  const heights = model.ridges.map((ridge) => ridgeHeights(ridge, model, heroLayout));
+  const front = frame.ridges[11], hidden = frame.ridges[8], back = frame.ridges[0];
+  const peakX = hourX(frame, front, 12.5), peakTop = front.baseline - heights[11][12];
+
+  it("selects the ridge that is actually visible, not a hidden line behind it", () => {
+    // A point on ridge 8's baseline that the front peak occludes.
+    expect(hidden.baseline).toBeGreaterThan(peakTop);
+    expect(visibleRidgeAt(frame, heights, peakX, hidden.baseline)).toEqual({ ridge: 11, hour: 12 });
+    // The old nearest-line rule would have chosen the hidden ridge there.
+    expect(nearestLine(frame, heights, peakX, hidden.baseline)?.ridge).toBe(8);
+    expect(pickRidge(frame, heights, peakX, hidden.baseline, null)).toEqual({ ridge: 11, hour: 12 });
+  });
+
+  it("keeps the current ridge within the hysteresis margin and switches beyond it", () => {
+    const x = hourX(frame, back, 3.5);
+    const gapMid = (frame.ridges[0].baseline + frame.ridges[1].baseline) / 2;
+    const margin = frame.gap * 0.42;
+    // Just past the midpoint toward ridge 1, ridge 0 is kept...
+    expect(pickRidge(frame, heights, x, gapMid + 1, 0)?.ridge).toBe(0);
+    expect(pickRidge(frame, heights, x, gapMid + margin - 1, 0)?.ridge).toBe(0);
+    // ...until the pointer is clearly on the next ridge.
+    expect(pickRidge(frame, heights, x, frame.ridges[1].baseline, 0)?.ridge).toBe(1);
+    // Without a current ridge the nearest visible line wins immediately.
+    expect(pickRidge(frame, heights, x, gapMid + 1, null)?.ridge).toBe(1);
+  });
+
+  it("never oscillates: tiny movements around a boundary do not flip selection", () => {
+    const x = hourX(frame, back, 3.5);
+    const gapMid = (frame.ridges[0].baseline + frame.ridges[1].baseline) / 2;
+    let current: number | null = 0, switches = 0;
+    for (let step = 0; step < 40; step++) {
+      const next: number = pickRidge(frame, heights, x, gapMid + (step % 2 ? 2 : -2), current)!.ridge;
+      if (next !== current) switches++;
+      current = next;
+    }
+    expect(switches).toBe(0);
+  });
+
+  it("places the marker exactly on the drawn curve at a bin centre", () => {
+    const point = binPoint(frame, front, heights[11], 12);
+    expect(point).toEqual({ x: Math.round(peakX * 100) / 100, y: Math.round(peakTop * 100) / 100 });
+    expect(ridgePath(frame, front, heights[11])).toContain(`${point.x},${point.y}`);
+  });
+
+  it("keeps the stipple local to the accented hours", () => {
+    const busy = heights[11].map(() => 60);
+    const local = localStipplePath(frame, front, busy, 12.5, 2);
+    const xs = new Set((local.match(/M([\d.]+),/g) ?? []).map((match) => Number(match.slice(1, -1))));
+    expect(xs.size).toBe(10); // Five hours (10.5–14.5) × two columns.
+    expect(localStipplePath(frame, front, busy, 12.5, 0.4).match(/h0/g)!.length).toBeLessThan(local.match(/h0/g)!.length);
+  });
+});
+
+describe("example developer cards", () => {
+  it("derive every statistic from each example's own synthetic fingerprint", () => {
+    expect(exampleDevelopers).toHaveLength(4);
+    for (const developer of exampleDevelopers) {
+      expect(developer.username).toMatch(/^example-/);
+      expect(developer.fingerprint.ridges).toHaveLength(14);
+      expect(developer.codingMs).toBe(summarizeFingerprint(developer.fingerprint).total);
+      expect(developer.activeDates).toBe(developer.fingerprint.ridges.filter((ridge) => (ridge.total ?? 0) > 0).length);
+      expect(developer.peakHour).toBe(summarizeFingerprint(developer.fingerprint).busiestHour);
+      const frame = fingerprintFrame(developer.fingerprint, cardLayout);
+      for (const ridge of frame.ridges) expect(ridge.right + cardLayout.tail).toBeLessThanOrEqual(cardLayout.width);
+    }
+    // Distinct shapes: every example peaks at a different UTC hour.
+    expect(new Set(exampleDevelopers.map((developer) => developer.peakHour)).size).toBe(4);
+  });
+
+  it("synthesizes deterministically from integer templates", () => {
+    const template = hours((hour) => (hour > 8 && hour < 18 ? 40 : 0));
+    const first = synthesizeFingerprintDays("2026-09-01", 7, [template, "missing", "zero", template]);
+    expect(synthesizeFingerprintDays("2026-09-01", 7, [template, "missing", "zero", template])).toEqual(first);
+    expect(first.map((day) => day.date)).toEqual(["2026-09-01", "2026-09-03", "2026-09-04"]);
+    expect(first[1].hours!.every((value) => value === 0)).toBe(true);
+    for (const value of first.flatMap((day) => day.hours!)) expect(Number.isInteger(value)).toBe(true);
+  });
+});
+
 describe("representative example dataset", () => {
+  it("is unchanged from the deployed Phase 9D example (pinned)", () => {
+    const summary = summarizeFingerprint(representativeFingerprint());
+    expect(summary.total).toBe(486_473_000);
+    expect(summary.busiestHour).toBe(10);
+    expect(summary.busiestDay).toMatchObject({ date: "2026-09-09", total: 30_245_000 });
+  });
+
   it("is a fixed, integer, clearly bounded 30-day example", () => {
     const days = representativeFingerprintDays();
     expect(representativeFingerprintDays()).toEqual(days);

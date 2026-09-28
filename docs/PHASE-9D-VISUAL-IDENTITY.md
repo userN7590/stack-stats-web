@@ -1,5 +1,11 @@
 # Phase 9D — visual identity and interactive activity fingerprint
 
+> **Superseded in part by [Phase 9D.1](PHASE-9D1-HOMEPAGE.md):** the homepage
+> structure (§3–4), annotation density (§6), fingerprint caption, selection and
+> highlight behaviour (§7, §10) and the matrix/Capture/Proof sections changed.
+> Data semantics (§8), rendering choice (§9), profile polish (§14) and the
+> public/private boundary (§15) are unchanged.
+
 Implemented against `PHASE-9B-SYNC.md`, `PHASE-9C-PROFILES.md` and
 `STACK-STATS-WEBSITE-VISUAL-DIRECTION.md`. The starting tree was clean at
 `d4ea491`. This phase is presentation only: no migration, SQL, RPC, API route,

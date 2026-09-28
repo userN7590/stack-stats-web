@@ -31,7 +31,9 @@ describe("public/private fingerprint boundary", () => {
   });
 
   it("keeps owner-only loading out of every public profile route and component", () => {
-    const publicSources = [...files("src/app/u"), ...files("src/components/profile"), "src/lib/public-profile.ts", "src/lib/synced-profile.ts", "src/lib/profile-content.ts", "src/lib/profile-layout.ts"];
+    // Homepage profile cards render only the public projection or labelled examples.
+    const publicSources = [...files("src/app/u"), ...files("src/components/profile"), "src/lib/public-profile.ts", "src/lib/synced-profile.ts", "src/lib/profile-content.ts", "src/lib/profile-layout.ts",
+      "src/components/home/profile-cards.tsx", "src/lib/example-developers.ts"];
     for (const path of publicSources) {
       const source = readFileSync(path, "utf8");
       expect(source, path).not.toContain("owner-fingerprint");
@@ -41,6 +43,12 @@ describe("public/private fingerprint boundary", () => {
     // The homepage server component never imports the owner loader directly.
     expect(readFileSync("src/app/page.tsx", "utf8")).not.toContain("owner-fingerprint");
     expect(readFileSync("src/components/home/home-view.tsx", "utf8")).not.toContain("owner-fingerprint");
+    // Owner data loads only from an explicit click handler, never on mount.
+    const owner = readFileSync("src/components/home/home-fingerprint.tsx", "utf8");
+    expect(owner.match(/loadOwnerFingerprint\(/g)).toHaveLength(1);
+    expect(owner).toMatch(/async function loadMine\(\) \{\s*setOwner\(\{ status: "loading" \}\);\s*setOwner\(await loadOwnerFingerprint\(\)\);/);
+    expect(owner).toContain("onClick={loadMine}");
+    expect(owner).not.toMatch(/useEffect/);
   });
 
   it("renders no fingerprint in public profiles, even with published hourly bins", () => {

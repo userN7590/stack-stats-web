@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Annotated, Crosshair, SketchArrow, SketchBrace, SketchNodeLoop, SketchUnderline } from "@/components/annotations/sketch";
 import { ActivityFingerprint, depthInk, describeFingerprint, describeSelection } from "@/components/fingerprint/activity-fingerprint";
-import { FingerprintMatrix, matrixLevel } from "@/components/fingerprint/fingerprint-matrix";
 import { buildFingerprint, FINGERPRINT_HOURS, representativeFingerprint } from "@/lib/activity-fingerprint";
 import { loadOwnerFingerprint, OWNER_FINGERPRINT_URL } from "@/lib/owner-fingerprint";
 
@@ -14,7 +13,7 @@ const mixed = buildFingerprint([
   { date: "2026-09-02", hours: null },
   { date: "2026-09-04", hours: hours(() => 0) },
 ]);
-const render = (model = mixed) => renderToStaticMarkup(<ActivityFingerprint model={model} title="Activity fingerprint" sourceNote="Representative example data." />);
+const render = (model = mixed) => renderToStaticMarkup(<ActivityFingerprint model={model} title="Activity fingerprint" label="30 days of coding · example data" />);
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -27,27 +26,33 @@ describe("activity fingerprint component", () => {
     expect(first).not.toMatch(/NaN|Infinity|undefined/);
   });
 
-  it("exposes an accessible name, description, readout and exact values table", () => {
+  it("keeps a short visible caption and an equivalent accessible table", () => {
     const html = render();
     expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-labelledby=/);
     expect(html).toContain("<title");
-    expect(html).toContain(describeFingerprint(mixed, "calendar").replace(/–/g, "–"));
-    expect(html).toMatch(/aria-live="polite"/);
+    expect(html).toContain(describeFingerprint(mixed, "calendar"));
+    expect(html).toMatch(/aria-live="polite"[^>]*>30 days of coding · example data<\/p>/);
     expect(html).toMatch(/role="group"[^>]*aria-label="Activity fingerprint\. Explore with arrow keys/);
-    expect(html).toContain("<details");
-    expect(html).toContain("Observed zero");
-    expect(html).toContain("Hourly data unavailable");
-    expect(html).toContain("No record");
-    expect(html).toContain("09:00–10:00 UTC");
+    // No visible legend, source essay or values disclosure; data stays available to assistive technology.
+    expect(html).not.toMatch(/<details|RIDGE = |Values by date|Highlighted:/);
+    const table = html.slice(html.indexOf('<div class="sr-only">'));
+    for (const text of ["<table>", "Observed zero", "Hourly data unavailable", "No record", "09:00–10:00 UTC"]) expect(table).toContain(text);
   });
 
-  it("draws observed, unavailable and missing dates as distinct marks", () => {
-    const html = render();
-    expect(html.match(/data-status="observed"/g)).toHaveLength(2);
-    expect(html).toMatch(/data-status="unavailable"[^>]*class="fp-unavailable"/);
-    expect(html).toMatch(/data-status="missing"[^>]*class="fp-missing"/);
-    // Only the highlighted observed ridge receives the stipple layer.
-    expect(html.match(/data-stipple/g)).toHaveLength(1);
+  it("renders no cursor line; the resting accent lives inside its own ridge group", () => {
+    const html = render(representativeFingerprint());
+    expect(html).not.toMatch(/data-cursor|fp-cursor/);
+    // The rest accent (local blue line + stipple) is painted inside the busiest ridge's group,
+    // so ridges in front of it occlude it like any other part of that ridge.
+    const group = html.match(/<g data-group="9"[\s\S]*?<\/g>/)![0];
+    expect(group).toMatch(/data-ridge="9"[^>]*class="fp-observed is-rest"/);
+    expect(group).toMatch(/class="fp-accent-line fp-rest-hl"[^>]*stroke="url\(#[\w-]+-rest\)"/);
+    expect(group).toContain("fp-stipple fp-rest-hl");
+    expect(html.match(/fp-rest-hl/g)).toHaveLength(2);
+    // Blue is a local gradient window around the peak hour, not a whole-ridge colour.
+    expect(html).toMatch(/<linearGradient id="[\w-]+-rest" gradientUnits="userSpaceOnUse" x1="[\d.]+" x2="[\d.]+"/);
+    expect(html).toContain("data-live-gradient");
+    expect(html).not.toContain("is-accent");
   });
 
   it("describes selections without turning missing or unavailable data into zero", () => {
@@ -72,16 +77,6 @@ describe("activity fingerprint component", () => {
     expect(outside).not.toMatch(/animation:\s*(fp-rise|sketch-draw)/);
   });
 
-  it("renders the readable matrix with levels, zero markers and no-record rows", () => {
-    const html = renderToStaticMarkup(<FingerprintMatrix model={mixed} title="Matrix" />);
-    expect(html).toMatch(/role="img"[^>]*aria-label="Matrix\. 2 dates with hourly observations, 1 without a record, 1 without hourly data\. Busiest hour overall 09:00–10:00 UTC\."/);
-    expect(html).toContain("no record");
-    expect(html).toContain('class="fp-matrix-zero"');
-    expect(matrixLevel(0, 10)).toBe(0);
-    expect(matrixLevel(1, 10)).toBe(1);
-    expect(matrixLevel(10, 10)).toBe(5);
-    expect(matrixLevel(5, 0)).toBe(0);
-  });
 });
 
 describe("annotation primitives", () => {

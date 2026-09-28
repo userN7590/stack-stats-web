@@ -145,6 +145,8 @@ export type FingerprintLayout = {
 };
 export const heroLayout: FingerprintLayout = { width: 1000, height: 600, padLeft: 24, padRight: 24, padTop: 16, padBottom: 44, skew: 11, amplitude: 150, tail: 18 };
 export const compactLayout: FingerprintLayout = { width: 640, height: 300, padLeft: 12, padRight: 12, padTop: 12, padBottom: 32, skew: 4, amplitude: 64, tail: 10 };
+/** Static miniature for profile cards (about two weeks of ridges). */
+export const cardLayout: FingerprintLayout = { width: 240, height: 88, padLeft: 3, padRight: 3, padTop: 2, padBottom: 3, skew: 4, amplitude: 30, tail: 3 };
 
 export type RidgeFrame = { index: number; baseline: number; left: number; right: number };
 export type FingerprintFrame = { layout: FingerprintLayout; plotWidth: number; gap: number; ridges: RidgeFrame[] };
@@ -167,6 +169,14 @@ export function fingerprintFrame(model: FingerprintModel, layout: FingerprintLay
 }
 
 export const hourX = (frame: FingerprintFrame, ridge: RidgeFrame, hour: number) => ridge.left + hour / FINGERPRINT_HOURS * frame.plotWidth;
+
+// Depth shading, back → front. Integer channel mixing keeps SSR/hydration identical.
+const BACK = [0x33, 0x32, 0x2c], FRONT = [0xd4, 0xd0, 0xc4];
+export function depthInk(index: number, count: number) {
+  const linear = count > 1 ? index / (count - 1) : 1;
+  const t = linear * linear * 0.55 + linear * 0.45;
+  return `#${BACK.map((channel, i) => Math.round(channel + (FRONT[i] - channel) * t).toString(16).padStart(2, "0")).join("")}`;
+}
 const fixed = (value: number) => Math.round(value * 100) / 100;
 
 type Point = [number, number];
@@ -238,6 +248,16 @@ export function stipplePath(frame: FingerprintFrame, ridgeFrame: RidgeFrame, hei
   return d;
 }
 
+/** Stipple only near one hour, so the accent stays local to the pointer. */
+export function localStipplePath(frame: FingerprintFrame, ridgeFrame: RidgeFrame, heights: readonly number[], centreHour: number, radius = 3.5, step = 5): string {
+  return stipplePath(frame, ridgeFrame, heights.map((height, hour) => Math.abs(hour + 0.5 - centreHour) <= radius ? height : 0), step);
+}
+
+/** A bin centre on the drawn curve (monotone paths pass exactly through it). */
+export function binPoint(frame: FingerprintFrame, ridgeFrame: RidgeFrame, heights: readonly number[], hour: number) {
+  return { x: fixed(hourX(frame, ridgeFrame, hour + 0.5)), y: fixed(ridgeFrame.baseline - heights[hour]) };
+}
+
 /** Point at the curve for a fractional hour, interpolating bin centres linearly. */
 export function heightAtHour(heights: readonly number[], hour: number): number {
   const position = hour - 0.5;
@@ -247,25 +267,54 @@ export function heightAtHour(heights: readonly number[], hour: number): number {
   return heights[lower] * (1 - fraction) + heights[lower + 1] * fraction;
 }
 
+export type RidgeHit = { ridge: number; hour: number };
+const hourOn = (frame: FingerprintFrame, ridgeFrame: RidgeFrame, x: number) => (x - ridgeFrame.left) / frame.plotWidth * FINGERPRINT_HOURS;
+const binAt = (hour: number) => Math.min(FINGERPRINT_HOURS - 1, Math.max(0, Math.floor(hour)));
+
 /**
- * Nearest ridge for a point in viewBox coordinates. Ridges without observed
- * values are still selectable so their status can be read, never as zero.
+ * The ridge actually visible at a point: the frontmost ridge whose filled
+ * silhouette (between its line and baseline) contains it. `heights` are the
+ * currently displayed heights, so hit-testing follows any deformation.
  */
-export function nearestRidge(model: FingerprintModel, frame: FingerprintFrame, x: number, y: number): { ridge: number; hour: number } | null {
-  let best: { ridge: number; hour: number } | null = null, bestDistance = Infinity;
+export function visibleRidgeAt(frame: FingerprintFrame, heights: readonly (readonly number[])[], x: number, y: number): RidgeHit | null {
+  const tail = frame.layout.tail / frame.plotWidth * FINGERPRINT_HOURS;
+  for (let index = frame.ridges.length - 1; index >= 0; index--) {
+    const ridgeFrame = frame.ridges[index], hour = hourOn(frame, ridgeFrame, x);
+    if (hour < -tail || hour > FINGERPRINT_HOURS + tail) continue;
+    const line = ridgeFrame.baseline - heightAtHour(heights[index], Math.min(FINGERPRINT_HOURS, Math.max(0, hour)));
+    if (y >= line - 0.75 && y <= ridgeFrame.baseline + 0.75) return { ridge: index, hour: binAt(hour) };
+  }
+  return null;
+}
+
+/** Nearest drawn line (for gaps between flat baselines); front ridges win ties. */
+export function nearestLine(frame: FingerprintFrame, heights: readonly (readonly number[])[], x: number, y: number): RidgeHit | null {
+  let best: RidgeHit | null = null, bestDistance = Infinity;
   for (const ridgeFrame of frame.ridges) {
-    const hour = (x - ridgeFrame.left) / frame.plotWidth * FINGERPRINT_HOURS;
+    const hour = hourOn(frame, ridgeFrame, x);
     if (hour < -0.5 || hour > FINGERPRINT_HOURS + 0.5) continue;
-    const heights = ridgeHeights(model.ridges[ridgeFrame.index], model, frame.layout);
-    const line = ridgeFrame.baseline - heightAtHour(heights, Math.min(FINGERPRINT_HOURS, Math.max(0, hour)));
-    // Ties resolve toward the front ridge, which is the one drawn on top.
-    const distance = Math.abs(y - line);
-    if (distance <= bestDistance) {
-      bestDistance = distance;
-      best = { ridge: ridgeFrame.index, hour: Math.min(FINGERPRINT_HOURS - 1, Math.max(0, Math.floor(hour))) };
-    }
+    const distance = Math.abs(y - (ridgeFrame.baseline - heightAtHour(heights[ridgeFrame.index], Math.min(FINGERPRINT_HOURS, Math.max(0, hour)))));
+    if (distance <= bestDistance) { bestDistance = distance; best = { ridge: ridgeFrame.index, hour: binAt(hour) }; }
   }
   return best;
+}
+
+/**
+ * Pointer selection with hysteresis. The current ridge is kept while it is
+ * still the visible surface within ±`margin` of the pointer, so small or fast
+ * movements near a boundary never flicker between neighbours.
+ */
+export function pickRidge(frame: FingerprintFrame, heights: readonly (readonly number[])[], x: number, y: number, current: number | null, margin = frame.gap * 0.42): RidgeHit | null {
+  const at = (offset: number) => visibleRidgeAt(frame, heights, x, y + offset) ?? nearestLine(frame, heights, x, y + offset);
+  const here = at(0);
+  if (!here || current === null || here.ridge === current || !frame.ridges[current]) return here;
+  if (at(-margin)?.ridge === current || at(margin)?.ridge === current) return { ridge: current, hour: binAt(hourOn(frame, frame.ridges[current], x)) };
+  return here;
+}
+
+/** Nearest line using resting geometry (kept for simple callers). */
+export function nearestRidge(model: FingerprintModel, frame: FingerprintFrame, x: number, y: number): RidgeHit | null {
+  return nearestLine(frame, model.ridges.map((ridge) => ridgeHeights(ridge, model, frame.layout)), x, y);
 }
 
 /* ------------------------------------------------------------- labelling */
@@ -314,23 +363,31 @@ function mulberry32(seed: number) {
   };
 }
 
-/** Clearly representative example data for anonymous/marketing presentation. */
-export function representativeFingerprintDays(): FingerprintInputDay[] {
-  const next = mulberry32(0x5eed_9d);
-  const start = parseDate(REPRESENTATIVE_FROM);
-  return plan.flatMap((kind, index): FingerprintInputDay[] => {
+/**
+ * Integer-only synthetic days from minutes-per-UTC-hour templates. Used only
+ * for clearly labelled example data; `scale` is a percentage per day.
+ */
+export function synthesizeFingerprintDays(from: string, seed: number, days: readonly (readonly number[] | "missing" | "zero")[], scale: (index: number, random: () => number) => number = (_, random) => 72 + random() % 38): FingerprintInputDay[] {
+  const next = mulberry32(seed);
+  const start = parseDate(from);
+  return days.flatMap((template, index): FingerprintInputDay[] => {
     const date = isoDate(start + index * DAY_MS);
-    if (kind === "missing") return [];
-    if (kind === "zero") return [{ date, hours: Array<number>(FINGERPRINT_HOURS).fill(0) }];
-    const scale = index === 9 ? 118 : 72 + next() % 38;
-    const hours = templates[kind].map(minutes => {
+    if (template === "missing") return [];
+    if (template === "zero") return [{ date, hours: Array<number>(FINGERPRINT_HOURS).fill(0) }];
+    const percent = scale(index, next);
+    const hours = template.map((minutes) => {
       const noise = next();
       if (minutes === 0) return 0;
-      const value = Math.min(59, Math.max(0, Math.floor(minutes * scale / 100) + (noise % 7) - 3));
+      const value = Math.min(59, Math.max(0, Math.floor(minutes * percent / 100) + (noise % 7) - 3));
       return value * 60_000 + (value ? (noise >>> 8) % 60 * 1000 : 0);
     });
     return [{ date, hours }];
   });
+}
+
+/** Clearly representative example data for anonymous/marketing presentation. */
+export function representativeFingerprintDays(): FingerprintInputDay[] {
+  return synthesizeFingerprintDays(REPRESENTATIVE_FROM, 0x5eed_9d, plan.map((kind) => kind === "missing" || kind === "zero" ? kind : templates[kind]), (index, random) => index === 9 ? 118 : 72 + random() % 38);
 }
 export function representativeFingerprint(): FingerprintModel {
   return buildFingerprint(representativeFingerprintDays(), { from: REPRESENTATIVE_FROM, to: REPRESENTATIVE_TO });
