@@ -1,5 +1,11 @@
 # Phase 9D.1 — homepage simplification, fingerprint interaction, profile cards
 
+> **Superseded in part by [Phase 9D.2](PHASE-9D2-HOMEPAGE.md):** the card stack
+> is now four cards with a coordinated fan, band-based selection, focus and
+> click lock (§4); the hero adds a VS Code entry path; the structural grid
+> gains proximity and ambient signals. Fingerprint behaviour (§5–7) is
+> unchanged.
+
 A focused polish pass on `219ea15` (Phase 9D). No change to database schemas,
 SQL, RPCs, API routes, sync protocol, publication or privacy semantics, or
 profile layout v3 behaviour. The profile editor and public profile are

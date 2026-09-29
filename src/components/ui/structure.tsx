@@ -9,12 +9,14 @@ import { Crosshair } from "@/components/annotations/sketch";
  */
 
 /** Full-bleed horizontal rule below; framed, railed content inside. */
-export function RuleSection({ children, className = "", frameClassName = "", guides = false, marks = false, id, label }: {
+export function RuleSection({ children, className = "", frameClassName = "", guides = false, marks = false, rulePulse, id, label }: {
   children: ReactNode;
   className?: string;
   frameClassName?: string;
   guides?: boolean;
   marks?: boolean;
+  /** Delay (s) of an ambient pulse along this section's bottom rule. */
+  rulePulse?: number;
   id?: string;
   label?: string;
 }) {
@@ -25,8 +27,19 @@ export function RuleSection({ children, className = "", frameClassName = "", gui
         {marks && <FrameMarks />}
         {children}
       </div>
+      {rulePulse !== undefined && <GridPulse edge="rule" delay={rulePulse} />}
     </section>
   );
+}
+
+/**
+ * A faint, slow signal that occasionally travels along one structural line.
+ * CSS-only and deterministic (fixed delays, no randomness); disabled with
+ * reduced motion. Place inside a frame for rails, or use `RuleSection
+ * rulePulse` for a section's bottom rule.
+ */
+export function GridPulse({ edge, delay }: { edge: "left" | "right" | "rule"; delay: number }) {
+  return <span aria-hidden="true" className={`grid-pulse grid-pulse-${edge}`} style={{ ["--pulse-delay" as string]: `${delay}s` }} />;
 }
 
 /** Six faint column guides that continue through whitespace (≥768px). */

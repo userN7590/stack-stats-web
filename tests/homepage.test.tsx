@@ -54,7 +54,9 @@ describe("homepage", () => {
     expect(html).toContain("Stack Stats tracks your coding in VS Code and turns it into a profile you can share.");
     expect(html).toMatch(/href="\/signup"[^>]*>Create your profile/);
     expect(html).toMatch(/aria-label="Log in"/);
-    expect(html.match(/data-profile-card=/g)).toHaveLength(5);
+    expect(html.match(/data-profile-card=/g)).toHaveLength(4);
+    // Two entry paths: profile first (primary) or tracking first in VS Code.
+    expect(html).toMatch(/<div class="hero-actions"><a[^>]*href="\/signup"[^>]*>Create your profile[\s\S]*?data-extension-cta="coming-soon"/);
     expect(html).toContain("data-fingerprint");
     expect(html).toContain("30 days of coding · example data");
     expect(html).not.toContain("Use my activity");
@@ -110,10 +112,11 @@ describe("homepage", () => {
 
   it("labels every other card as a fictional example", async () => {
     const cards = (await home()).match(/<li class="pcard[\s\S]*?<\/li>/g)!.slice(1);
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(3);
     for (const card of cards) {
       expect(card).toMatch(/^<li class="pcard"/);
-      expect(card).toMatch(/<article class="pcard-body" aria-label="Example profile \(fictional\): /);
+      // Focusable so keyboard users can bring each example forward.
+      expect(card).toMatch(/<article class="pcard-body" tabindex="0" aria-label="Example profile \(fictional\): /);
       expect(card).toContain(">Example<");
       expect(card).toMatch(/@example-[a-z]+/);
       expect(card).not.toMatch(/href=/);

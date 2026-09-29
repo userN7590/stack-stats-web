@@ -3,11 +3,13 @@ import Link from "next/link";
 
 import { Annotated, SketchBrace } from "@/components/annotations/sketch";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { ExtensionCta } from "@/components/home/extension-cta";
 import { HomeFingerprint } from "@/components/home/home-fingerprint";
 import { ProfileCards } from "@/components/home/profile-cards";
 import { AppNavbar } from "@/components/ui/app-navbar";
 import { Logo } from "@/components/ui/logo";
-import { RuleSection } from "@/components/ui/structure";
+import { GridSignal } from "@/components/ui/grid-signal";
+import { GridPulse, RuleSection } from "@/components/ui/structure";
 import type { PublicProfile } from "@/lib/types";
 
 export type HomeViewer = { signedIn: boolean; username: string | null };
@@ -28,13 +30,14 @@ export function HomeView({ viewer, example }: { viewer: HomeViewer; example: Hom
   const primaryLabel = viewer.username ? `View /u/${viewer.username}` : viewer.signedIn ? "Set up your profile" : "Create your profile";
   const secondary = viewer.username === example.profile.username && example.live ? null
     : example.live ? { href: `/u/${example.profile.username}`, label: `View @${example.profile.username}’s profile` } : { href: "/example", label: "View example profile" };
-  const cta = (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+  // Two entry paths: profile first (primary) or tracking first in VS Code.
+  const actions = (
+    <div className="hero-actions">
       <Link href={primaryHref} className={primaryButton}>
         {primaryLabel}
         <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
       </Link>
-      {secondary && <Link href={secondary.href} className={quietLink}>{secondary.label} <span aria-hidden="true">→</span></Link>}
+      <ExtensionCta />
     </div>
   );
 
@@ -42,6 +45,7 @@ export function HomeView({ viewer, example }: { viewer: HomeViewer; example: Hom
   // describe the same data (example, or the owner's own after a click).
   const activity = (
     <RuleSection label="Activity" frameClassName="activity-frame">
+      <GridPulse edge="right" delay={19} />
       <HomeFingerprint
         signedIn={viewer.signedIn}
         intro={
@@ -86,7 +90,9 @@ export function HomeView({ viewer, example }: { viewer: HomeViewer; example: Hom
         </div>
       </AppNavbar>
 
-      <RuleSection guides marks label="Introduction" frameClassName="hero-frame">
+      <GridSignal />
+      <RuleSection guides marks rulePulse={11} label="Introduction" frameClassName="hero-frame">
+        <GridPulse edge="left" delay={3} />
         <div className="site-inset relative z-10 pt-12 sm:pt-16 lg:pt-20">
           <h1 className="hero-title" data-hero-title="">
             <span>Your{" "}<Annotated marks={<><SketchBrace side="left" className="hero-brace hero-brace-left" delay={650} /><SketchBrace side="right" className="hero-brace hero-brace-right" delay={900} /></>}>development.</Annotated></span>
@@ -98,7 +104,8 @@ export function HomeView({ viewer, example }: { viewer: HomeViewer; example: Hom
             <p className="text-base leading-7 text-[#c8c4b9] sm:text-lg sm:leading-8">
               Stack Stats tracks your coding in VS Code and turns it into a profile you can share.
             </p>
-            <div className="mt-7">{cta}</div>
+            <div className="mt-7">{actions}</div>
+            {secondary && <Link href={secondary.href} className={`mt-4 ${quietLink}`}>{secondary.label} <span aria-hidden="true">→</span></Link>}
           </div>
           <div className="hero-cards"><ProfileCards profile={example.profile} live={example.live} /></div>
         </div>
@@ -109,7 +116,7 @@ export function HomeView({ viewer, example }: { viewer: HomeViewer; example: Hom
       <RuleSection label="Get started" marks>
         <div className="final-cta site-inset">
           <h2 className="section-title">What does your coding look like?</h2>
-          {cta}
+          {actions}
         </div>
       </RuleSection>
 

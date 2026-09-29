@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
+import { CardStack } from "@/components/home/card-stack";
 import { Avatar } from "@/components/profile/avatar";
 import {
   buildFingerprint,
@@ -27,17 +28,12 @@ const statOrder: StatId[] = ["coding_minutes", "lines_added", "edit_events", "fi
 const withheld = new Set(["Not published", "Unavailable"]);
 
 /**
- * Desktop resting composition: the live profile sits at the front-right and
- * the examples fan out behind it, rising left to right like the ridgeline.
- * Units are multiples of the responsive card width/step (see CSS).
+ * Desktop resting fan, in visual order (back-left → front-right). `y` is in
+ * rise units, `r` in degrees; the live card is last (front) and 10% larger.
+ * Four cards (not five) give every example about half its width as a stable
+ * target; see docs/PHASE-9D2-HOMEPAGE.md for the comparison.
  */
-const slots = [
-  { x: 4, y: 0, r: -2.2, z: 5 },
-  { x: 0, y: 4.2, r: -6.5, z: 1 },
-  { x: 1, y: 3.1, r: -2.8, z: 2 },
-  { x: 2, y: 2.3, r: 3.2, z: 3 },
-  { x: 3, y: 1.1, r: -0.8, z: 4 },
-];
+const fan = { stepRatio: 0.47, frontScale: 1.1, slots: [{ y: 3.3, r: -5 }, { y: 2.2, r: -2.4 }, { y: 1.1, r: 2.2 }, { y: 0, r: -1.2 }] };
 
 type Stat = { value: string; label: string };
 type Card = {
@@ -126,8 +122,8 @@ function LanguageBar({ languages }: { languages: { name: string; percentage: num
   );
 }
 
-function ProfileCard({ card, slot, front }: { card: Card; slot: (typeof slots)[number]; front: boolean }) {
-  const style = { "--x": slot.x, "--y": slot.y, "--r": `${slot.r}deg`, "--z": slot.z } as CSSProperties;
+function ProfileCard({ card, position, slot, front }: { card: Card; position: number; slot: { y: number; r: number }; front: boolean }) {
+  const style = { "--pos": position, "--y": slot.y, "--r": `${slot.r}deg`, "--z": front ? 5 : position + 1 } as CSSProperties;
   const body = (
     <>
       <div className="pcard-strip">
@@ -158,10 +154,11 @@ function ProfileCard({ card, slot, front }: { card: Card; slot: (typeof slots)[n
     </>
   );
   return (
-    <li className={`pcard${front ? " pcard-front" : ""}`} style={style} data-profile-card={card.key}>
+    <li className={`pcard${front ? " pcard-front" : ""}`} style={style} data-profile-card={card.key} data-card-pos={position}>
       {card.href
         ? <Link href={card.href} className="pcard-body">{body}</Link>
-        : <article className="pcard-body" aria-label={`Example profile (fictional): ${card.name}`}>{body}</article>}
+        // Focusable so keyboard users can bring each example forward (Enter/Space locks it).
+        : <article className="pcard-body" tabIndex={0} aria-label={`Example profile (fictional): ${card.name}`}>{body}</article>}
     </li>
   );
 }
@@ -170,12 +167,19 @@ function ProfileCard({ card, slot, front }: { card: Card; slot: (typeof slots)[n
  * Overlapping developer profile cards. The front card is the real public
  * profile (same approved projection as its page) or, if unavailable, the
  * labelled example persona. The rest are fictional, labelled examples.
+ * DOM order is live card first (reading, tab and phone-strip order); the
+ * desktop fan places it front-right via `--pos`.
  */
 export function ProfileCards({ profile, live }: { profile: PublicProfile; live: boolean }) {
   const cards = [liveCard(profile, live), ...exampleDevelopers.map(exampleCard)];
+  const count = cards.length;
+  const style = { "--n": count, "--step-ratio": fan.stepRatio, "--front-scale": fan.frontScale, "--ymax": fan.slots[0].y } as CSSProperties;
   return (
-    <ul className="pcards" aria-label="Developer profile cards">
-      {cards.map((card, index) => <ProfileCard key={card.key} card={card} slot={slots[index]} front={index === 0} />)}
-    </ul>
+    <CardStack label="Developer profile cards" style={style}>
+      {cards.map((card, index) => {
+        const position = index === 0 ? count - 1 : index - 1;
+        return <ProfileCard key={card.key} card={card} position={position} slot={fan.slots[position]} front={index === 0} />;
+      })}
+    </CardStack>
   );
 }

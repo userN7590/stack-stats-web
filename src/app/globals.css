@@ -169,7 +169,42 @@ input:-webkit-autofill:focus {
 .profile-mark { position: absolute; bottom: -9px; z-index: 2; width: 17px; height: 17px; pointer-events: none; }
 .profile-mark-left { left: -9px; }
 .profile-mark-right { right: -9px; }
-.nav-rails { border-inline: 1px solid var(--rule); }
+.nav-rails { border-inline: 1px solid var(--rule); isolation: isolate; }
+
+/* Grid proximity (grid-signal.tsx): near the pointer, a short segment of each
+   nearby rail, column guide or section rule brightens. JS writes only local
+   pointer coordinates; each 1px strip's radial gradient provides the falloff,
+   so distant parts of the same line stay neutral. */
+:root { --glow: rgba(85, 167, 255, .5); --glow-r: 130px; --gx: -9999px; --gy: -9999px; --gxl: -9999px; --gxr: -9999px; --gyb: -9999px; --gw: 0px; }
+.site-frame::before, .site-frame::after, .nav-rails::before, .nav-rails::after, .site-guides > span::after, .site-section::after, .grid-rule::after {
+  content: ""; position: absolute; pointer-events: none; opacity: 0; transition: opacity .35s ease;
+}
+.site-frame::before, .site-frame::after, .nav-rails::before, .nav-rails::after { top: 0; bottom: 0; z-index: -1; width: 1px; }
+.site-frame::before, .nav-rails::before { left: -1px; background: radial-gradient(circle var(--glow-r) at var(--gxl) var(--gy), var(--glow), transparent); }
+.site-frame::after, .nav-rails::after { right: -1px; background: radial-gradient(circle var(--glow-r) at var(--gxr) var(--gy), var(--glow), transparent); }
+.site-guides > span { position: relative; }
+.site-guides > span:nth-child(1) { --k: 1; } .site-guides > span:nth-child(2) { --k: 2; } .site-guides > span:nth-child(3) { --k: 3; }
+.site-guides > span:nth-child(4) { --k: 4; } .site-guides > span:nth-child(5) { --k: 5; }
+.site-guides > span:not(:last-child)::after { top: 0; right: 0; bottom: 0; width: 1px; background: radial-gradient(circle var(--glow-r) at calc(var(--gx) - var(--k) * var(--gw) / 6 + 1px) var(--gy), var(--glow), transparent); }
+.site-section::after, .grid-rule::after { left: 0; right: 0; bottom: -1px; height: 1px; background: radial-gradient(circle var(--glow-r) at var(--gx) var(--gyb), var(--glow), transparent); }
+.grid-near::before, .grid-near::after, .site-guides.grid-near > span::after { opacity: 1; }
+
+/* Ambient signal: one faint blue-gray pulse occasionally travels along a few
+   chosen lines (fixed delays; compositor-only transforms). */
+.grid-pulse { position: absolute; overflow: hidden; pointer-events: none; container-type: size; }
+.grid-pulse-left, .grid-pulse-right { top: 0; bottom: 0; z-index: -1; width: 1px; }
+.grid-pulse-left { left: -1px; }
+.grid-pulse-right { right: -1px; }
+.grid-pulse-rule { left: 0; right: 0; bottom: -1px; height: 1px; }
+.grid-pulse::before { content: ""; position: absolute; top: 0; left: 0; }
+.grid-pulse-left::before, .grid-pulse-right::before { width: 1px; height: 180px; background: linear-gradient(transparent, rgba(128, 170, 220, .38), transparent); transform: translateY(-180px); }
+.grid-pulse-rule::before { width: 280px; height: 1px; background: linear-gradient(to right, transparent, rgba(128, 170, 220, .38), transparent); transform: translateX(-280px); }
+@media (prefers-reduced-motion: no-preference) {
+  .grid-pulse-left::before, .grid-pulse-right::before { animation: grid-pulse-y 26s cubic-bezier(.45, 0, .55, 1) var(--pulse-delay, 0s) infinite both; }
+  .grid-pulse-rule::before { animation: grid-pulse-x 26s cubic-bezier(.45, 0, .55, 1) var(--pulse-delay, 0s) infinite both; }
+}
+@keyframes grid-pulse-y { 0% { transform: translateY(-180px); } 30%, 100% { transform: translateY(100cqh); } }
+@keyframes grid-pulse-x { 0% { transform: translateX(-280px); } 30%, 100% { transform: translateX(100cqw); } }
 
 /* Annotations: hand-added marks over precise typesetting. Decorative only. */
 .sketch-anchor { position: relative; display: inline-block; isolation: isolate; }
@@ -250,31 +285,53 @@ input:-webkit-autofill:focus {
 @media (max-width: 899px) {
   /* Phones/tablets: large objects span the viewport, crossing the rails. */
   .activity-figure .fp-stage { margin-inline: calc(-1 * var(--full-bleed)); width: calc(100% + 2 * var(--full-bleed)); aspect-ratio: 1000 / 720; }
-  .hero-cards { margin-inline: calc(-1 * var(--full-bleed)); }
 }
 @media (max-width: 639px) {
   .activity-figure .fp-stage { aspect-ratio: 1000 / 820; }
 }
 @media (min-width: 900px) {
+  .activity-figure .fp-stage { width: calc(100% + var(--bleed)); }
+}
+@media (max-width: 1023px) {
+  .hero-cards { margin-inline: calc(-1 * var(--full-bleed)); }
+}
+@media (min-width: 1024px) {
   .hero-body { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 1.75rem; }
   .hero-lede { position: relative; z-index: 2; grid-area: 1 / 1 / 2 / 3; align-self: start; padding-right: 1rem; }
-  /* Cards rise into the headline's open right side and cross the right rail. */
-  /* The rise scales with viewport width so the diagonal stack never covers
-     the headline: none at 900px, the full rise from ~1360px. */
-  .hero-cards { grid-area: 1 / 3 / 2 / 7; margin-top: clamp(-8rem, calc(196px - 23.8vw), 0px); margin-right: calc(-1 * var(--bleed)); }
-  .activity-figure .fp-stage { width: calc(100% + var(--bleed)); }
+  /* Cards rise into the headline's open right side and cross the right rail.
+     The rise scales with viewport width so the fan never covers the headline. */
+  .hero-cards { grid-area: 1 / 3 / 2 / 7; margin-top: clamp(-7.5rem, calc(170px - 21vw), 0px); margin-right: calc(-1 * var(--bleed)); }
+}
+
+/* Hero entry paths: profile (primary) and VS Code (secondary, outlined). */
+.hero-actions { display: flex; flex-wrap: wrap; align-items: stretch; gap: .75rem; }
+.ext-cta { display: inline-flex; min-height: 44px; align-items: center; gap: .7rem; padding: .5rem .9rem .5rem .75rem; border: 1px solid #3b3931; color: #edeae0; }
+a.ext-cta { transition: border-color .15s ease, color .15s ease; }
+a.ext-cta:hover { border-color: #55a7ff; }
+a.ext-cta:focus-visible { outline: 2px solid #55a7ff; outline-offset: 3px; }
+.ext-cta-soon { border-style: dashed; }
+.ext-cta-mark { width: 18px; height: 18px; flex-shrink: 0; fill: #3d9bea; }
+.ext-cta-text { display: flex; flex-direction: column; gap: .15rem; }
+.ext-cta-label { font-family: var(--font-profile-terminal); font-size: 12px; font-weight: 600; line-height: 1.3; }
+.ext-cta-tag { margin-left: .35rem; font-size: 9.5px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: #858177; }
+.ext-cta-note { font-size: 11.5px; line-height: 1.35; color: #969287; }
+@media (min-width: 1024px) {
+  /* The hero's text column is narrow beside the fan: stack the two paths. */
+  .hero-lede .hero-actions { flex-direction: column; align-items: flex-start; }
 }
 
 /* Profile cards: tactile, rotated and overlapping over the quiet grid. */
-.pcards { --card-w: clamp(214px, 19.5vw, 254px); --step: calc(var(--card-w) * .41); --rise: calc(var(--card-w) * .11); position: relative; margin: 0; padding: 0; list-style: none; }
+.pcards { --card-w: clamp(230px, 20vw, 270px); --card-ease: cubic-bezier(.22, .78, .24, 1); position: relative; margin: 0; padding: 0; list-style: none; }
 .pcard { position: relative; }
 /* Each card is a scaled object: every internal size is in em of a font size
    derived from the card width, so content never reflows or clips. */
-.pcard-body { --card-bg: #151511; display: flex; flex-direction: column; aspect-ratio: 5 / 7.6; overflow: hidden; border: 1px solid #302f28; border-radius: 1.2em; background: var(--card-bg); color: #edeae0; font-size: calc(var(--card-w) * .046); box-shadow: inset 0 1px 0 rgba(237, 234, 224, .04), 0 2px 6px rgba(0, 0, 0, .35), 0 24px 44px -26px rgba(0, 0, 0, .95); }
-.pcard-front .pcard-body { --card-bg: #181814; border-color: #3d3c33; }
-a.pcard-body { transition: border-color .2s ease; }
-a.pcard-body:hover { border-color: #4e6f93; }
-a.pcard-body:focus-visible { outline: 2px solid #55a7ff; outline-offset: 3px; }
+.pcard-body { --card-bg: #151511; display: flex; flex-direction: column; aspect-ratio: 5 / 7.6; overflow: hidden; border: 1px solid #302f28; border-radius: 1.2em; background: var(--card-bg); color: #edeae0; font-size: calc(var(--card-w) * .046); box-shadow: inset 0 1px 0 rgba(237, 234, 224, .04), 0 2px 6px rgba(0, 0, 0, .35), 0 24px 44px -26px rgba(0, 0, 0, .95); transition: border-color .2s ease; }
+/* The live profile is the focal card: larger, frontmost, stronger edge. */
+.pcard-front .pcard-body { --card-bg: #191915; border-color: #4a493f; box-shadow: inset 0 1px 0 rgba(237, 234, 224, .06), 0 2px 8px rgba(0, 0, 0, .4), 0 30px 54px -28px rgba(0, 0, 0, .95); }
+a.pcard-body:hover, .pcard[data-fan="active"] .pcard-body { border-color: #4e6f93; }
+.pcard[data-locked] .pcard-body { border-color: #55a7ff; }
+a.pcard-body:focus-visible, article.pcard-body:focus-visible { outline: 2px solid #55a7ff; outline-offset: 3px; }
+article.pcard-body { cursor: pointer; }
 .pcard-strip { display: flex; flex-shrink: 0; justify-content: space-between; gap: .75em; padding: .7em 1.1em; border-bottom: 1px solid #27261f; font-family: var(--font-profile-terminal); font-size: .81em; letter-spacing: .04em; color: #77746b; }
 .pcard-tag { flex-shrink: 0; letter-spacing: .14em; text-transform: uppercase; color: #858177; }
 .pcard-tag-live { color: #55a7ff; }
@@ -286,7 +343,7 @@ a.pcard-body:focus-visible { outline: 2px solid #55a7ff; outline-offset: 3px; }
 .pcard-bio { display: -webkit-box; flex-shrink: 0; overflow: hidden; padding: .75em 1.1em 0; font-size: .98em; line-height: 1.45; color: #969287; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .pcard-primary { flex-shrink: 0; margin-top: 1em; padding: .85em 1.1em .8em; border-top: 1px solid #27261f; }
 .pcard-value { font-family: var(--font-profile-terminal); font-size: 2.2em; line-height: 1; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
-.pcard-label, .pcard-secondary dt { margin-top: .45em; font-family: var(--font-profile-terminal); font-size: .73em; letter-spacing: .12em; text-transform: uppercase; color: #858177; }
+.pcard-label, .pcard-secondary dt { margin-top: .45em; font-family: var(--font-profile-terminal); font-size: .76em; letter-spacing: .1em; text-transform: uppercase; color: #858177; }
 .pcard-secondary { display: grid; flex-shrink: 0; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid #27261f; }
 .pcard-secondary > div { display: flex; flex-direction: column-reverse; min-width: 0; padding: .65em 1.1em; }
 .pcard-secondary > div + div { border-left: 1px solid #27261f; }
@@ -297,20 +354,37 @@ a.pcard-body:focus-visible { outline: 2px solid #55a7ff; outline-offset: 3px; }
 .pcard-bar { display: flex; height: .5em; overflow: hidden; margin-block: .4em; background: #24231e; }
 .pcard-bar > span { height: 100%; }
 .pcard-langs { flex-shrink: 0; overflow: hidden; padding: .55em 1.35em 1.1em; font-family: var(--font-profile-terminal); font-size: .81em; color: #858177; text-overflow: ellipsis; white-space: nowrap; }
-@media (min-width: 900px) {
-  .pcards { width: calc(var(--card-w) + var(--step) * 4); height: calc(var(--card-w) * 1.52 + var(--rise) * 4.4); margin-left: auto; }
-  .pcard { position: absolute; left: calc(var(--x) * var(--step)); top: calc(var(--y) * var(--rise)); z-index: var(--z); width: var(--card-w); transform: rotate(var(--r)); transition: transform .38s cubic-bezier(.2, .7, .2, 1), translate .38s cubic-bezier(.2, .7, .2, 1); }
-  /* Hover/focus lifts a card forward and eases its rotation; its visual
-     neighbours part slightly. DOM order is live card first, then examples. */
-  .pcard:hover, .pcard:focus-within { z-index: 10; transform: translateY(-14px) rotate(calc(var(--r) * .3)); }
-  .pcard:not(.pcard-front):hover + .pcard, .pcards:has(.pcard:last-child:hover) .pcard-front { translate: calc(var(--step) * .24) 0; }
-  .pcard:not(.pcard-front):has(+ .pcard:hover), .pcards:has(.pcard-front:hover) .pcard:last-child { translate: calc(var(--step) * -.24) 0; }
+@media (min-width: 1024px) {
+  /* The resting fan: back-left to front-right, each example exposing about
+     half its width as a stable target. --n, --step-ratio, --front-scale and
+     --ymax come from the composition (see profile-cards.tsx). */
+  .pcards {
+    --front-w: calc(var(--card-w) * var(--front-scale, 1.1));
+    --step: calc(var(--card-w) * var(--step-ratio, .47));
+    --rise: calc(var(--card-w) * .11);
+    --spread-before: calc(var(--card-w) * .08);
+    --spread-after: calc(var(--card-w) * .17);
+    width: calc(var(--spread-before) + var(--step) * (var(--n) - 1) + var(--front-w) + var(--spread-after));
+    height: calc(max(var(--card-w) * 1.52 + var(--rise) * var(--ymax), var(--front-w) * 1.52) + 24px);
+    margin-left: auto;
+  }
+  .pcard { position: absolute; left: calc(var(--spread-before) + var(--pos) * var(--step)); top: calc(var(--y) * var(--rise) + 18px); z-index: var(--z); width: var(--card-w); transform: rotate(var(--r)); transition: transform 280ms var(--card-ease), translate 280ms var(--card-ease), z-index 0s linear 0s; }
+  .pcard-front { width: var(--front-w); }
+  .pcard-front .pcard-body { font-size: calc(var(--front-w) * .046); }
+  /* One coordinated fan: the active card lifts and straightens; cards behind
+     it slide back-left, cards in front slide away right to reveal it. Its
+     z-index rises only after the neighbours have started to part. */
+  .pcards[data-active] .pcard[data-fan="before"] { translate: calc(-1 * var(--spread-before)) 0; }
+  .pcards[data-active] .pcard[data-fan="after"] { translate: var(--spread-after) 0; }
+  .pcard[data-fan="active"] { z-index: 20; transform: translateY(-14px) rotate(calc(var(--r) * .25)); transition: transform 280ms var(--card-ease), translate 280ms var(--card-ease), z-index 0s linear 90ms; }
 }
-@media (max-width: 899px) {
-  /* Touch: a native horizontal swipe that snaps; the live card comes first. */
-  .pcards { --card-w: min(74vw, 268px); display: flex; gap: 14px; overflow-x: auto; padding: 18px var(--full-bleed) 30px; scroll-snap-type: x mandatory; scroll-padding-inline: var(--full-bleed); overscroll-behavior-x: contain; scrollbar-width: none; }
+@media (max-width: 1023px) {
+  /* Touch and narrow windows: a native horizontal swipe that snaps; the live
+     card comes first. A tap or focus emphasises a card; nothing needs hover. */
+  .pcards { --card-w: min(74vw, 268px); display: flex; gap: 14px; overflow-x: auto; padding: 22px var(--full-bleed) 30px; scroll-snap-type: x mandatory; scroll-padding-inline: var(--full-bleed); overscroll-behavior-x: contain; scrollbar-width: none; }
   .pcards::-webkit-scrollbar { display: none; }
-  .pcard { flex: 0 0 var(--card-w); scroll-snap-align: start; transform: rotate(calc(var(--r) * .3)); }
+  .pcard { flex: 0 0 var(--card-w); scroll-snap-align: start; transform: rotate(calc(var(--r) * .3)); transition: transform 240ms var(--card-ease); }
+  .pcard[data-fan="active"] { transform: translateY(-8px) rotate(0deg); }
 }
 
 /* Activity section: the fingerprint as the centrepiece. */

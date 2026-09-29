@@ -247,7 +247,7 @@ describe("visible-surface selection with hysteresis", () => {
 
 describe("example developer cards", () => {
   it("derive every statistic from each example's own synthetic fingerprint", () => {
-    expect(exampleDevelopers).toHaveLength(4);
+    expect(exampleDevelopers).toHaveLength(3);
     for (const developer of exampleDevelopers) {
       expect(developer.username).toMatch(/^example-/);
       expect(developer.fingerprint.ridges).toHaveLength(14);
@@ -258,7 +258,7 @@ describe("example developer cards", () => {
       for (const ridge of frame.ridges) expect(ridge.right + cardLayout.tail).toBeLessThanOrEqual(cardLayout.width);
     }
     // Distinct shapes: every example peaks at a different UTC hour.
-    expect(new Set(exampleDevelopers.map((developer) => developer.peakHour)).size).toBe(4);
+    expect(new Set(exampleDevelopers.map((developer) => developer.peakHour)).size).toBe(3);
   });
 
   it("synthesizes deterministically from integer templates", () => {
