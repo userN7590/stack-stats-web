@@ -11,7 +11,7 @@ import ExtensionConnectPage from "../src/app/extension/connect/page";
 
 const request = {
   challenge: "a".repeat(43), state: "b".repeat(64),
-  redirectUri: "vscode://undefined_publisher.stack-stats-vscode/auth/callback?windowId=7",
+  redirectUri: "vscode://stackstats.stack-stats-vscode/auth/callback?windowId=7",
   scope: "stats:write",
 };
 const next = "/extension/connect?" + new URLSearchParams(request);
@@ -22,6 +22,15 @@ beforeEach(() => {
 });
 
 describe("login, signup and profile setup continuation", () => {
+  it.each([
+    "vscode://StackStats.stack-stats-vscode/auth/callback%3FwindowId%3D7",
+    "vscode://StackStats.stack-stats-vscode/auth/callback%253FwindowId%253D7",
+    "vscode://StackStats.stack-stats-vscode.evil/auth/callback?windowId=7",
+  ])("rejects a malformed callback before requesting an account: %s", async redirectUri => {
+    const page = await ExtensionConnectPage({ searchParams: Promise.resolve({ ...request, redirectUri }) });
+    expect(page.props.title).toBe("Invalid connection request");
+    expect(mocks.getUser).not.toHaveBeenCalled();
+  });
   it("preserves the full request on both auth forms and alternate auth links", async () => {
     for (const [Page, alternate] of [[LoginPage, "/signup"], [SignupPage, "/login"]] as const) {
       const page = await Page({ searchParams: Promise.resolve({ next }) });

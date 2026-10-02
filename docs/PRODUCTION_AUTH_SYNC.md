@@ -119,7 +119,12 @@ Optional, normally **unset** (or literal `[]`):
 STACK_STATS_EXTENSION_REDIRECT_URIS=[]
 ```
 
-Native v0.5.0 callbacks are already allowlisted:
+For the 0.6.0 Marketplace release, deploy the code and follow
+[MARKETPLACE_AUTH_060.md](MARKETPLACE_AUTH_060.md). Supabase settings and existing
+database migrations stay unchanged for this callback-only update. The native
+allowlist includes the canonical `StackStats.stack-stats-vscode` authority and
+VS Code's exact lowercase `stackstats.stack-stats-vscode` wire form. Legacy
+v0.5.0 callbacks below remain temporarily available under that removal plan:
 
 ```text
 vscode://undefined_publisher.stack-stats-vscode/auth/callback

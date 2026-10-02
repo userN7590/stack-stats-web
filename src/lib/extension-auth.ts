@@ -18,20 +18,29 @@ export function appOrigin(): string {
   return origin;
 }
 
+const nativeRedirects = ["vscode", "vscode-insiders", "cursor", "windsurf"].flatMap(scheme => [
+  `${scheme}://StackStats.stack-stats-vscode/auth/callback`,
+  // VS Code Uri.toString(true) lowercases the authority on the wire.
+  `${scheme}://stackstats.stack-stats-vscode/auth/callback`,
+  // Temporary beta/VSIX compatibility; removal is tracked in MARKETPLACE_AUTH_060.md.
+  `${scheme}://undefined_publisher.stack-stats-vscode/auth/callback`,
+]);
+
 export function validRedirect(value: string): boolean {
-  const defaults = ["vscode", "vscode-insiders", "cursor", "windsurf"].map(scheme => `${scheme}://undefined_publisher.stack-stats-vscode/auth/callback`);
   try {
+    if (value.length > 2048 || /[\u0000-\u0020\u007f\\]/.test(value)) return false;
     const extra: unknown = JSON.parse(process.env.STACK_STATS_EXTENSION_REDIRECT_URIS ?? "[]");
     if (!Array.isArray(extra) || !extra.every(uri => typeof uri === "string")) return false;
     const url = new URL(value);
     if (url.username || url.password || url.hash || url.searchParams.has("code") || url.searchParams.has("ss_state") || url.searchParams.has("error")) return false;
-    if ([...defaults, ...extra].includes(value)) return true;
+    if (extra.includes(value)) return true;
     // asExternalUri adds this native editor routing parameter. Permit only one
-    // bounded numeric window ID on an otherwise exact known native callback.
-    const keys = [...url.searchParams.keys()];
-    if (keys.length !== 1 || keys[0] !== "windowId" || !/^[0-9]{1,10}$/.test(url.searchParams.get("windowId") ?? "")) return false;
-    url.search = "";
-    return defaults.includes(url.toString());
+    // bounded numeric window ID on a byte-for-byte known native callback. Do not
+    // normalize paths, casing or percent escapes before comparing the allowlist.
+    const queryStart = value.indexOf("?");
+    const base = queryStart === -1 ? value : value.slice(0, queryStart);
+    return nativeRedirects.includes(base)
+      && (queryStart === -1 || /^\?windowId=[0-9]{1,10}$/.test(value.slice(queryStart)));
   } catch { return false; }
 }
 

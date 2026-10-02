@@ -8,7 +8,7 @@ import { GET } from "../src/app/auth/callback/route";
 
 const continuation = "/extension/connect?scope=stats%3Awrite&state=" + "a".repeat(64)
   + "&challenge=" + "b".repeat(43)
-  + "&redirectUri=" + encodeURIComponent("vscode://undefined_publisher.stack-stats-vscode/auth/callback?windowId=7");
+  + "&redirectUri=" + encodeURIComponent("vscode://stackstats.stack-stats-vscode/auth/callback?windowId=7");
 
 beforeEach(() => {
   vi.stubEnv("STACK_STATS_APP_ORIGIN", "https://stackstats.dev");

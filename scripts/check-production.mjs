@@ -5,7 +5,7 @@ const target = new URL(process.argv[2] ?? "https://stackstats.dev");
 const publicOrigin = process.env.STACK_STATS_APP_ORIGIN ?? target.origin;
 const continuation = "/extension/connect?" + new URLSearchParams({
   challenge: "a".repeat(43), state: "b".repeat(64), scope: "stats:write",
-  redirectUri: "vscode://undefined_publisher.stack-stats-vscode/auth/callback?windowId=7",
+  redirectUri: "vscode://stackstats.stack-stats-vscode/auth/callback?windowId=7",
 });
 const cases = [
   ["GET", continuation, 307],
